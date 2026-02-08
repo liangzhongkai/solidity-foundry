@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.20;
 
 contract PackingChallengeOptimized {
     // 优化后的顺序：uint128 a, uint128 c, uint256 b
