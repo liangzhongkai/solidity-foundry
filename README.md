@@ -25,6 +25,7 @@ $ forge build
 
 ```shell
 $ forge test
+$ forge test --match-path test/Counter.t.sol --gas-report -vvvvv
 ```
 
 ### Format
