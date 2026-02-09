@@ -21,4 +21,10 @@ contract CounterTest is Test {
         counter.setNumber(x);
         assertEq(counter.number(), x);
     }
+
+    function test_Decrement() public {
+        vm.expectRevert("number cannot go below zero");
+        counter.decrement();
+    }
+
 }
