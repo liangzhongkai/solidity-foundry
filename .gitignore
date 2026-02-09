@@ -12,3 +12,21 @@ docs/
 
 # Dotenv file
 .env
+
+# Node.js
+node_modules/
+
+# IDE & Editor
+.vscode/
+.idea/
+.claude/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+coverage/
