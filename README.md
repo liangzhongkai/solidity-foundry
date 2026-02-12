@@ -36,7 +36,7 @@ $ forge fmt
 
 ### Pre-commit
 
-Automatically format Solidity code before each commit:
+Runs the same checks as CI before each commit (npm ci, forge fmt --check, build, test):
 
 ```shell
 pip install pre-commit   # or: brew install pre-commit

@@ -8,8 +8,8 @@ optimizer_runs = 200
 fuzz = { runs = 256 }
 verbosity = 3
 
-# 静默编译模式 - 禁用所有警告和 lint 提示
-[profile.silent]
-verbosity = 0
+# # 静默编译模式 - 禁用所有警告和 lint 提示
+# [profile.silent]
+# verbosity = 0
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

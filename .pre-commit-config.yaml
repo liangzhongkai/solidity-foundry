@@ -1,5 +1,8 @@
 repos:
-  - repo: https://github.com/0xYYY/foundry-pre-commit
-    rev: v1.0.0
+  - repo: local
     hooks:
-      - id: format
+      - id: ci-checks
+        name: CI checks (npm ci, forge fmt, build, test)
+        entry: scripts/pre-commit-ci.sh
+        language: system
+        pass_filenames: false
