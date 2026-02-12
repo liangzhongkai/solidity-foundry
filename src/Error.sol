@@ -13,7 +13,7 @@ contract Error {
         revert NotAuthorized(); // 消耗小
     }
 
-    function throwCustomError_WithMessage() external pure {
+    function throwCustomErrorWithMessage() external pure {
         revert NotAuthorized_WithMessage("not authorized"); // 消耗小
     }
 }

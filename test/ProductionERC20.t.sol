@@ -17,6 +17,11 @@ contract ProductionERC20Test is Test {
 
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
+    event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
+    event DelegateVotesChanged(address indexed delegate, uint256 previousBalance, uint256 newBalance);
+
+    bytes32 constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     function setUp() public {
         owner = address(this);
@@ -398,5 +403,242 @@ contract ProductionERC20Test is Test {
 
         assertEq(token.balanceOf(owner), ownerBalanceBefore - DEFAULT_TRANSFER_AMOUNT);
         assertEq(token.balanceOf(addr2), addr2BalanceBefore + DEFAULT_TRANSFER_AMOUNT);
+    }
+
+    // ============================================================
+    // 9. EIP-2612 Permit
+    // ============================================================
+
+    function test_Permit_ThenTransferFrom() public {
+        uint256 signerPk = 0xBEEF;
+        address signer = vm.addr(signerPk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        token.transfer(signer, 1000 ether);
+
+        uint256 value = 500 ether;
+        uint256 deadline = block.timestamp + 1 hours;
+        uint256 nonce = token.nonces(signer);
+
+        bytes32 structHash = keccak256(
+            abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline)
+        );
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+
+        token.permit(signer, addr1, value, deadline, v, r, s);
+
+        assertEq(token.allowance(signer, addr1), value);
+        assertEq(token.nonces(signer), 1);
+
+        vm.prank(addr1);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        token.transferFrom(signer, addr2, value);
+
+        assertEq(token.balanceOf(signer), 500 ether);
+        assertEq(token.balanceOf(addr2), value);
+    }
+
+    function test_Permit_DeadlineExpired() public {
+        uint256 signerPk = 0xBEEF;
+        address signer = vm.addr(signerPk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        token.transfer(signer, 1000 ether);
+
+        uint256 value = 500 ether;
+        uint256 deadline = block.timestamp - 1;
+        uint256 nonce = token.nonces(signer);
+
+        bytes32 structHash = keccak256(
+            abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline)
+        );
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+
+        vm.expectRevert(ProductionERC20.PermitDeadlineExpired.selector);
+        token.permit(signer, addr1, value, deadline, v, r, s);
+    }
+
+    function test_Permit_InvalidSigner() public {
+        uint256 signerPk = 0xBEEF;
+        address signer = vm.addr(signerPk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        token.transfer(signer, 1000 ether);
+
+        uint256 value = 500 ether;
+        uint256 deadline = block.timestamp + 1 hours;
+        uint256 nonce = token.nonces(signer);
+        // Sign with wrong key (addr1's key) so recovered address != signer
+        bytes32 structHash = keccak256(
+            abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline)
+        );
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(1, digest); // wrong key
+
+        vm.expectRevert(ProductionERC20.InvalidSigner.selector);
+        token.permit(signer, addr1, value, deadline, v, r, s);
+    }
+
+    function test_Permit_NonceIncrements() public {
+        uint256 signerPk = 0xBEEF;
+        address signer = vm.addr(signerPk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        token.transfer(signer, 1000 ether);
+
+        uint256 value = 100 ether;
+        uint256 deadline = block.timestamp + 1 hours;
+
+        for (uint256 i = 0; i < 3; i++) {
+            uint256 nonce = token.nonces(signer);
+            bytes32 structHash = keccak256(
+                abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline)
+            );
+            bytes32 digest = keccak256(
+                abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
+            );
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+            token.permit(signer, addr1, value, deadline, v, r, s);
+            assertEq(token.nonces(signer), i + 1);
+        }
+    }
+
+    // ============================================================
+    // 10. EIP-5805 Vote delegation
+    // ============================================================
+
+    function test_Delegate_ToSelf() public {
+        token.delegate(owner);
+        assertEq(token.delegates(owner), owner);
+        assertEq(token.getVotes(owner), token.balanceOf(owner));
+    }
+
+    function test_Delegate_ToOther() public {
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        token.transfer(addr1, 300 ether);
+        vm.prank(addr1);
+        token.delegate(addr2);
+
+        assertEq(token.delegates(addr1), addr2);
+        assertEq(token.getVotes(addr2), 300 ether);
+        assertEq(token.getVotes(addr1), 0);
+    }
+
+    function test_Delegate_ToZero() public {
+        token.delegate(owner);
+        assertEq(token.getVotes(owner), token.balanceOf(owner));
+
+        token.delegate(address(0));
+        assertEq(token.delegates(owner), address(0));
+        assertEq(token.getVotes(owner), 0);
+    }
+
+    function test_Delegate_Transfer_UpdatesVotes() public {
+        token.delegate(owner);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        token.transfer(addr1, 200 ether);
+
+        vm.prank(addr1);
+        token.delegate(addr1);
+
+        assertEq(token.getVotes(owner), token.balanceOf(owner));
+        assertEq(token.getVotes(addr1), 200 ether);
+    }
+
+    function test_GetPastVotes() public {
+        token.delegate(owner);
+        uint256 block1 = block.number;
+        assertEq(token.getPastVotes(owner, block1 - 1), 0);
+
+        vm.roll(block.number + 1);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        token.transfer(addr1, 100 ether);
+        vm.prank(addr1);
+        token.delegate(addr2);
+        uint256 block2 = block.number;
+
+        vm.roll(block.number + 1); // advance so we can query block2 (getPastVotes requires timepoint < block.number)
+        assertEq(token.getPastVotes(owner, block1), INITIAL_SUPPLY);
+        assertEq(token.getPastVotes(owner, block2), INITIAL_SUPPLY - 100 ether);
+        assertEq(token.getPastVotes(addr2, block2), 100 ether);
+    }
+
+    function test_GetPastVotes_FutureReverts() public {
+        token.delegate(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProductionERC20.ERC5805FutureLookup.selector, block.number + 1, block.number
+            )
+        );
+        token.getPastVotes(owner, block.number + 1);
+    }
+
+    function test_Delegate_EmitsDelegateChanged() public {
+        vm.expectEmit(true, true, true, false);
+        emit DelegateChanged(owner, address(0), owner);
+        token.delegate(owner);
+    }
+
+    function test_DelegateBySig() public {
+        uint256 signerPk = 0xBEEF;
+        address signer = vm.addr(signerPk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        token.transfer(signer, 500 ether);
+
+        uint256 nonce = token.nonces(signer);
+        uint256 expiry = block.timestamp + 1 hours;
+        address delegatee = addr2;
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)"),
+                delegatee,
+                nonce,
+                expiry
+            )
+        );
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+
+        token.delegateBySig(delegatee, nonce, expiry, v, r, s);
+
+        assertEq(token.delegates(signer), delegatee);
+        assertEq(token.getVotes(delegatee), 500 ether);
+        assertEq(token.nonces(signer), 1);
+    }
+
+    function test_DelegateBySig_ExpiredReverts() public {
+        uint256 signerPk = 0xBEEF;
+        address signer = vm.addr(signerPk);
+        // forge-lint: disable-next-line(erc20-unchecked-transfer)
+        token.transfer(signer, 500 ether);
+
+        uint256 nonce = token.nonces(signer);
+        uint256 expiry = block.timestamp - 1;
+        bytes32 structHash = keccak256(
+            abi.encode(
+                keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)"),
+                addr2,
+                nonce,
+                expiry
+            )
+        );
+        bytes32 digest = keccak256(
+            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+
+        vm.expectRevert(ProductionERC20.PermitDeadlineExpired.selector);
+        token.delegateBySig(addr2, nonce, expiry, v, r, s);
+    }
+
+    function test_GetVotes_ZeroAddress() public view {
+        assertEq(token.getVotes(address(0)), 0);
     }
 }

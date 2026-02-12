@@ -10,6 +10,9 @@ contract ProductionERC20 {
     error MintToZeroAddress();
     error BurnFromZeroAddress();
     error ApprovalToZeroAddress();
+    error PermitDeadlineExpired();
+    error InvalidSigner();
+    error ERC5805FutureLookup(uint256 timepoint, uint256 currentBlock);
 
     // Assembly 优化常量
     uint256 private constant BALANCES_SLOT = 3; // _balances mapping 的存储槽位
@@ -23,9 +26,24 @@ contract ProductionERC20 {
     mapping(address => uint256) private _balances; // slot 3
     mapping(address => mapping(address => uint256)) private _allowances; // slot 4
 
+    // EIP-2612 permit
+    uint256 internal immutable INITIAL_CHAIN_ID;
+    bytes32 internal immutable INITIAL_DOMAIN_SEPARATOR;
+    mapping(address => uint256) public nonces;
+
+    // EIP-5805 vote delegation
+    struct Checkpoint {
+        uint32 fromBlock;
+        uint224 votes;
+    }
+    mapping(address => address) private _delegates;
+    mapping(address => Checkpoint[]) private _delegateCheckpoints;
+
     // Events with indexed parameters
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Approval(address indexed owner, address indexed spender, uint256 value);
+    event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
+    event DelegateVotesChanged(address indexed delegate, uint256 previousBalance, uint256 newBalance);
 
     constructor(
         string memory _name,
@@ -40,6 +58,8 @@ contract ProductionERC20 {
         DECIMALS = _decimals;
 
         if (initialOwner == address(0)) revert MintToZeroAddress();
+        INITIAL_CHAIN_ID = block.chainid;
+        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
         _mint(initialOwner, initialSupply);
     }
 
@@ -134,6 +154,204 @@ contract ProductionERC20 {
         return true;
     }
 
+    // ---------- EIP-2612 Permit ----------
+    /// @dev EIP-2612 标准规定必须使用 DOMAIN_SEPARATOR 作为函数名
+    // forge-lint: disable-next-line(mixed-case-function)
+    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : computeDomainSeparator();
+    }
+
+    function computeDomainSeparator() internal view returns (bytes32 result) {
+        bytes memory data = abi.encode(
+            keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+            keccak256(bytes(name)),
+            keccak256("1"),
+            block.chainid,
+            address(this)
+        );
+        assembly {
+            result := keccak256(add(data, 32), mload(data))
+        }
+    }
+
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        if (deadline < block.timestamp) revert PermitDeadlineExpired();
+
+        unchecked {
+            address recoveredAddress = ecrecover(
+                keccak256(
+                    abi.encodePacked(
+                        "\x19\x01",
+                        DOMAIN_SEPARATOR(),
+                        keccak256(
+                            abi.encode(
+                                keccak256(
+                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+                                ),
+                                owner,
+                                spender,
+                                value,
+                                nonces[owner]++,
+                                deadline
+                            )
+                        )
+                    )
+                ),
+                v,
+                r,
+                s
+            );
+            if (recoveredAddress == address(0) || recoveredAddress != owner) revert InvalidSigner();
+            _approve(owner, spender, value);
+        }
+    }
+
+    // ---------- EIP-5805 Vote delegation ----------
+    function delegates(address account) external view returns (address) {
+        return _delegates[account];
+    }
+
+    function getVotes(address account) external view returns (uint256) {
+        Checkpoint[] storage ckpts = _delegateCheckpoints[account];
+        uint256 len = ckpts.length;
+        if (len == 0) return 0;
+        return ckpts[len - 1].votes;
+    }
+
+    function getPastVotes(address account, uint256 timepoint) external view returns (uint256) {
+        if (timepoint >= block.number) revert ERC5805FutureLookup(timepoint, block.number);
+        Checkpoint[] storage ckpts = _delegateCheckpoints[account];
+        uint256 len = ckpts.length;
+        if (len == 0) return 0;
+        if (uint256(ckpts[len - 1].fromBlock) <= timepoint) return ckpts[len - 1].votes;
+        if (uint256(ckpts[0].fromBlock) > timepoint) return 0;
+        uint256 low = 0;
+        uint256 high = len - 1;
+        while (low < high) {
+            uint256 mid = (low + high + 1) / 2;
+            if (uint256(ckpts[mid].fromBlock) <= timepoint) {
+                low = mid;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return ckpts[low].votes;
+    }
+
+    function delegate(address delegatee) external {
+        address fromDelegate = _delegates[msg.sender];
+        if (fromDelegate == delegatee) return;
+
+        _delegates[msg.sender] = delegatee;
+        uint256 balance = _balances[msg.sender];
+
+        if (fromDelegate != address(0)) {
+            uint256 oldVotes = _getVotesAt(fromDelegate);
+            uint256 newVotes = oldVotes - balance;
+            _pushCheckpoint(fromDelegate, oldVotes, newVotes);
+        }
+        if (delegatee != address(0)) {
+            uint256 oldVotes = _getVotesAt(delegatee);
+            uint256 newVotes = oldVotes + balance;
+            _pushCheckpoint(delegatee, oldVotes, newVotes);
+        }
+        emit DelegateChanged(msg.sender, fromDelegate, delegatee);
+    }
+
+    function delegateBySig(
+        address delegatee,
+        uint256 nonce_,
+        uint256 expiry,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        if (expiry < block.timestamp) revert PermitDeadlineExpired();
+
+        bytes memory structEncoded = abi.encode(
+            keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)"),
+            delegatee,
+            nonce_,
+            expiry
+        );
+        bytes32 structHash;
+        assembly {
+            structHash := keccak256(add(structEncoded, 32), mload(structEncoded))
+        }
+        bytes memory digestEncoded = abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash);
+        bytes32 digest;
+        assembly {
+            digest := keccak256(add(digestEncoded, 32), mload(digestEncoded))
+        }
+        address signer = ecrecover(digest, v, r, s);
+        if (signer == address(0)) revert InvalidSigner();
+        if (nonces[signer] != nonce_) revert InvalidSigner();
+
+        unchecked {
+            nonces[signer]++;
+        }
+
+        address fromDelegate = _delegates[signer];
+        if (fromDelegate == delegatee) return;
+
+        _delegates[signer] = delegatee;
+        uint256 balance = _balances[signer];
+
+        if (fromDelegate != address(0)) {
+            uint256 oldVotes = _getVotesAt(fromDelegate);
+            uint256 newVotes = oldVotes - balance;
+            _pushCheckpoint(fromDelegate, oldVotes, newVotes);
+        }
+        if (delegatee != address(0)) {
+            uint256 oldVotes = _getVotesAt(delegatee);
+            uint256 newVotes = oldVotes + balance;
+            _pushCheckpoint(delegatee, oldVotes, newVotes);
+        }
+        emit DelegateChanged(signer, fromDelegate, delegatee);
+    }
+
+    function _getVotesAt(address account) internal view returns (uint256) {
+        Checkpoint[] storage ckpts = _delegateCheckpoints[account];
+        uint256 len = ckpts.length;
+        if (len == 0) return 0;
+        return ckpts[len - 1].votes;
+    }
+
+    function _pushCheckpoint(address delegatee, uint256 oldVotes, uint256 newVotes) internal {
+        if (oldVotes == newVotes) return;
+        Checkpoint[] storage ckpts = _delegateCheckpoints[delegatee];
+        uint32 blockNumber = uint32(block.number);
+        if (blockNumber != 0 && ckpts.length > 0 && ckpts[ckpts.length - 1].fromBlock == blockNumber) {
+            // forge-lint: disable-next-line(unsafe-typecast) -- votes fit in uint224 (supply << 2^224)
+            ckpts[ckpts.length - 1].votes = uint224(newVotes);
+        } else {
+            // forge-lint: disable-next-line(unsafe-typecast) -- votes fit in uint224 (supply << 2^224)
+            ckpts.push(Checkpoint({ fromBlock: blockNumber, votes: uint224(newVotes) }));
+        }
+        emit DelegateVotesChanged(delegatee, oldVotes, newVotes);
+    }
+
+    function _moveVotingPower(address fromDelegate, address toDelegate, uint256 amount) internal {
+        if (fromDelegate != address(0)) {
+            uint256 oldVotes = _getVotesAt(fromDelegate);
+            uint256 newVotes = oldVotes - amount;
+            _pushCheckpoint(fromDelegate, oldVotes, newVotes);
+        }
+        if (toDelegate != address(0)) {
+            uint256 oldVotes = _getVotesAt(toDelegate);
+            uint256 newVotes = oldVotes + amount;
+            _pushCheckpoint(toDelegate, oldVotes, newVotes);
+        }
+    }
+
     function _transfer(address from, address to, uint256 amount) internal {
         uint256 fromBalance = _balances[from];
         if (fromBalance < amount) {
@@ -146,6 +364,7 @@ contract ProductionERC20 {
         }
 
         emit Transfer(from, to, amount);
+        _moveVotingPower(_delegates[from], _delegates[to], amount);
     }
 
     // Assembly 优化版本的 transfer
@@ -180,6 +399,7 @@ contract ProductionERC20 {
             mstore(0x00, amount)
             log3(0x00, 0x20, 0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef, from, to)
         }
+        _moveVotingPower(_delegates[from], _delegates[to], amount);
     }
 
     function _approve(address owner, address spender, uint256 amount) internal {
@@ -195,6 +415,7 @@ contract ProductionERC20 {
             _balances[account] += amount;
         }
         emit Transfer(address(0), account, amount);
+        _moveVotingPower(address(0), _delegates[account], amount);
     }
 
     function _burn(address account, uint256 amount) internal {
@@ -210,6 +431,7 @@ contract ProductionERC20 {
             totalSupply -= amount;
         }
         emit Transfer(account, address(0), amount);
+        _moveVotingPower(_delegates[account], address(0), amount);
     }
 
     // 公开的 burn 函数 - 燃烧调用者自己的代币

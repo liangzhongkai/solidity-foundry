@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {Error} from "../src/Error.sol";
 
 contract ErrorTest is Test {
@@ -28,7 +28,7 @@ contract ErrorTest is Test {
 
     function test_Revert_ThrowCustomError_WithMessage() public {
         vm.expectRevert(abi.encodeWithSelector(Error.NotAuthorized_WithMessage.selector, "not authorized"));
-        err.throwCustomError_WithMessage();
+        err.throwCustomErrorWithMessage();
     }
 
     // Add label to assertions
