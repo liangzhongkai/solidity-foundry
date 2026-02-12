@@ -34,6 +34,15 @@ $ forge test --match-path test/Counter.t.sol --gas-report -vvvvv
 $ forge fmt
 ```
 
+### Pre-commit
+
+Automatically format Solidity code before each commit:
+
+```shell
+pip install pre-commit   # or: brew install pre-commit
+pre-commit install
+```
+
 ### Gas Snapshots
 
 ```shell

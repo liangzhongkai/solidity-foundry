@@ -419,12 +419,8 @@ contract ProductionERC20Test is Test {
         uint256 deadline = block.timestamp + 1 hours;
         uint256 nonce = token.nonces(signer);
 
-        bytes32 structHash = keccak256(
-            abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline)
-        );
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
-        );
+        bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
 
         token.permit(signer, addr1, value, deadline, v, r, s);
@@ -450,12 +446,8 @@ contract ProductionERC20Test is Test {
         uint256 deadline = block.timestamp - 1;
         uint256 nonce = token.nonces(signer);
 
-        bytes32 structHash = keccak256(
-            abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline)
-        );
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
-        );
+        bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
 
         vm.expectRevert(ProductionERC20.PermitDeadlineExpired.selector);
@@ -472,12 +464,8 @@ contract ProductionERC20Test is Test {
         uint256 deadline = block.timestamp + 1 hours;
         uint256 nonce = token.nonces(signer);
         // Sign with wrong key (addr1's key) so recovered address != signer
-        bytes32 structHash = keccak256(
-            abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline)
-        );
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
-        );
+        bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(1, digest); // wrong key
 
         vm.expectRevert(ProductionERC20.InvalidSigner.selector);
@@ -495,12 +483,8 @@ contract ProductionERC20Test is Test {
 
         for (uint256 i = 0; i < 3; i++) {
             uint256 nonce = token.nonces(signer);
-            bytes32 structHash = keccak256(
-                abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline)
-            );
-            bytes32 digest = keccak256(
-                abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
-            );
+            bytes32 structHash = keccak256(abi.encode(PERMIT_TYPEHASH, signer, addr1, value, nonce, deadline));
+            bytes32 digest = keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash));
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
             token.permit(signer, addr1, value, deadline, v, r, s);
             assertEq(token.nonces(signer), i + 1);
@@ -570,9 +554,7 @@ contract ProductionERC20Test is Test {
     function test_GetPastVotes_FutureReverts() public {
         token.delegate(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                ProductionERC20.ERC5805FutureLookup.selector, block.number + 1, block.number
-            )
+            abi.encodeWithSelector(ProductionERC20.ERC5805FutureLookup.selector, block.number + 1, block.number)
         );
         token.getPastVotes(owner, block.number + 1);
     }
@@ -595,15 +577,10 @@ contract ProductionERC20Test is Test {
 
         bytes32 structHash = keccak256(
             abi.encode(
-                keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)"),
-                delegatee,
-                nonce,
-                expiry
+                keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)"), delegatee, nonce, expiry
             )
         );
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
-        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
 
         token.delegateBySig(delegatee, nonce, expiry, v, r, s);
@@ -622,16 +599,9 @@ contract ProductionERC20Test is Test {
         uint256 nonce = token.nonces(signer);
         uint256 expiry = block.timestamp - 1;
         bytes32 structHash = keccak256(
-            abi.encode(
-                keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)"),
-                addr2,
-                nonce,
-                expiry
-            )
+            abi.encode(keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)"), addr2, nonce, expiry)
         );
-        bytes32 digest = keccak256(
-            abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash)
-        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", token.DOMAIN_SEPARATOR(), structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
 
         vm.expectRevert(ProductionERC20.PermitDeadlineExpired.selector);

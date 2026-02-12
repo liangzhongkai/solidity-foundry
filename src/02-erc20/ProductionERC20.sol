@@ -174,15 +174,9 @@ contract ProductionERC20 {
         }
     }
 
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        external
+    {
         if (deadline < block.timestamp) revert PermitDeadlineExpired();
 
         unchecked {
@@ -266,21 +260,11 @@ contract ProductionERC20 {
         emit DelegateChanged(msg.sender, fromDelegate, delegatee);
     }
 
-    function delegateBySig(
-        address delegatee,
-        uint256 nonce_,
-        uint256 expiry,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external {
+    function delegateBySig(address delegatee, uint256 nonce_, uint256 expiry, uint8 v, bytes32 r, bytes32 s) external {
         if (expiry < block.timestamp) revert PermitDeadlineExpired();
 
         bytes memory structEncoded = abi.encode(
-            keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)"),
-            delegatee,
-            nonce_,
-            expiry
+            keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)"), delegatee, nonce_, expiry
         );
         bytes32 structHash;
         assembly {
@@ -334,7 +318,7 @@ contract ProductionERC20 {
             ckpts[ckpts.length - 1].votes = uint224(newVotes);
         } else {
             // forge-lint: disable-next-line(unsafe-typecast) -- votes fit in uint224 (supply << 2^224)
-            ckpts.push(Checkpoint({ fromBlock: blockNumber, votes: uint224(newVotes) }));
+            ckpts.push(Checkpoint({fromBlock: blockNumber, votes: uint224(newVotes)}));
         }
         emit DelegateVotesChanged(delegatee, oldVotes, newVotes);
     }
