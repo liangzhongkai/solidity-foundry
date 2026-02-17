@@ -29,15 +29,15 @@ contract ProductionERC20 {
     // EIP-2612 permit
     uint256 internal immutable INITIAL_CHAIN_ID;
     bytes32 internal immutable INITIAL_DOMAIN_SEPARATOR;
-    mapping(address => uint256) public nonces;
+    mapping(address => uint256) public nonces; // slot 5
 
     // EIP-5805 vote delegation
     struct Checkpoint {
         uint32 fromBlock;
         uint224 votes;
     }
-    mapping(address => address) private _delegates;
-    mapping(address => Checkpoint[]) private _delegateCheckpoints;
+    mapping(address => address) private _delegates; // slot 6
+    mapping(address => Checkpoint[]) private _delegateCheckpoints; // slot 7
 
     // Events with indexed parameters
     event Transfer(address indexed from, address indexed to, uint256 value);
