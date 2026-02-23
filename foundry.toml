@@ -8,6 +8,10 @@ optimizer_runs = 200
 fuzz = { runs = 256 }
 verbosity = 3
 
+# CI profile: enable FFI for tests that use vm.ffi()
+[profile.ci]
+ffi = true
+
 # # 静默编译模式 - 禁用所有警告和 lint 提示
 # [profile.silent]
 # verbosity = 0

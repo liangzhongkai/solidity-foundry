@@ -7,4 +7,4 @@ export FOUNDRY_PROFILE=ci
 npm ci
 forge fmt --check
 forge build --sizes
-forge test -vvv
+forge test -vvv --ffi
