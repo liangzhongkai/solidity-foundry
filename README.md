@@ -28,6 +28,13 @@ $ forge test
 $ forge test --match-path test/Counter.t.sol --gas-report -vvvvv
 ```
 
+FFI tests (e.g. `DifferentialTest.t.sol`) require Python and `eth-abi`:
+
+```shell
+pip install -r requirements.txt
+forge test --ffi
+```
+
 ### Format
 
 ```shell

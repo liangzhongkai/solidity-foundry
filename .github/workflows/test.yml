@@ -31,6 +31,14 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
       - name: Run Forge fmt
         run: forge fmt --check
 
