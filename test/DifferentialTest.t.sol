@@ -35,6 +35,8 @@ contract DifferentialTest is Test {
 
         int128 y0 = ffi_exp(x);
         int128 y1 = exp(x);
+        console.log("y0", y0);
+        console.log("y1", y1);
 
         // Check |y0 - y1| <= 1
         uint256 DELTA = 2 ** 64;
