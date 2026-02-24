@@ -65,7 +65,14 @@ $ anvil
 ### Deploy
 
 ```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>  // 模拟部署
+
+$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key> --broadcast // 真实部署到rpc url
+
+$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key> --broadcast --verify // 真实部署到rpc url, 并进行验证
+
+// 建议在 forge create 中使用 --verify 标志，以便部署后在 explorer 上自动验证合约。 请注意，对于 Etherscan，必须设置 ETHERSCAN_API_KEY。
+$ forge create --rpc-url <your_rpc_url> --private-key <your_private_key> src/Storage.sol:Storage --broadcast --verify -vvvv 
 ```
 
 ### Cast

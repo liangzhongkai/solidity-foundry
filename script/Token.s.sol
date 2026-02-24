@@ -8,6 +8,7 @@ import {ERC20} from "../src/02-erc20/ERC20.sol";
 // https://dashboard.alchemy.com/ 获取alchemy的api key, 用于获取sepolia测试网的rpc url: SEPOLIA_RPC_URL, 然后配置到.env文件中
 // https://sepoliafaucet.org/ 获取sepolia测试网的钱包地址
 // https://sepolia.etherscan.io/ 获取sepolia测试网的区块浏览器
+// $ forge script script/Token.s.sol:TokenScript --rpc-url $SEPOLIA_RPC_URL --private-key $DEV_PRIVATE_KEY --broadcast --verify -vvvv
 contract MyToken is ERC20 {
     constructor(string memory name, string memory symbol, uint8 decimals) ERC20(name, symbol, decimals) {}
 
