@@ -130,6 +130,12 @@ $ cast call $STORAGE_ADDR "retrieve()(uint256)" --rpc-url $SEPOLIA_RPC_URL
 100
 ```
 
+### Mockcall
+
+```shell
+forge test --fork-url $MAINNET_FORK_URL --match-path test/MockCall.sol -vvv
+```
+
 ### Cast
 
 ```shell
