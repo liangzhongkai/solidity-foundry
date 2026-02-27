@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 
 address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
@@ -10,10 +10,10 @@ address constant PRICE_ORACLE = 0x54586bE62E3c3580375aE3723C145253060Ca0C2;
 
 // forge test --fork-url $MAINNET_FORK_URL --match-path test/MockCall.sol -vvv
 contract AaveTest is Test {
-    IWETH private constant weth = IWETH(WETH);
-    IERC20 private constant dai = IERC20(DAI);
+    IWETH private constant WETH_CONST = IWETH(WETH);
+    IERC20 private constant DAI_CONST = IERC20(DAI);
 
-    IPool private constant pool = IPool(POOL_PROXY);
+    IPool private constant POOL = IPool(POOL_PROXY);
     // 1 = stable, 2 = variable
     uint256 private constant INTEREST_RATE_MODE = 2;
 
@@ -21,24 +21,24 @@ contract AaveTest is Test {
 
     function setUp() public {
         // Skip when not running with --fork-url (CI/pre-commit)
-        if (address(pool).code.length == 0) vm.skip(true);
+        if (address(POOL).code.length == 0) vm.skip(true);
 
         deal(users[0], 100 * 1e18);
 
         vm.startPrank(users[0]);
-        weth.deposit{value: 1 * 1e18}();
-        weth.approve(address(pool), type(uint256).max);
+        WETH_CONST.deposit{value: 1 * 1e18}();
+        WETH_CONST.approve(address(POOL), type(uint256).max);
         vm.stopPrank();
 
         vm.startPrank(users[1]);
         deal(DAI, users[1], 10000 * 1e18);
-        dai.approve(address(pool), type(uint256).max);
+        DAI_CONST.approve(address(POOL), type(uint256).max);
         vm.stopPrank();
 
         vm.label(POOL_PROXY, "pool");
     }
 
-    function get_hf() private view returns (uint256) {
+    function getHf() private view returns (uint256) {
         // (
         //     uint256 totalCollateralBase,
         //     uint256 totalDebtBase,
@@ -46,22 +46,22 @@ contract AaveTest is Test {
         //     uint256 currentLiquidationThreshold,
         //     uint256 ltv,
         //     uint256 healthFactor
-        // ) = pool.getUserAccountData(users[0]);
-        (,,,,, uint256 healthFactor) = pool.getUserAccountData(users[0]);
+        // ) = POOL.getUserAccountData(users[0]);
+        (,,,,, uint256 healthFactor) = POOL.getUserAccountData(users[0]);
         return healthFactor;
     }
 
     function test() public {
         // users[0] supplies 1 WETH
         vm.prank(users[0]);
-        pool.supply(WETH, 1 * 1e18, users[0], 0);
+        POOL.supply(WETH, 1 * 1e18, users[0], 0);
 
         // Set WETH price
         vm.mockCall(PRICE_ORACLE, abi.encodeCall(IAaveOracle.getAssetPrice, (WETH)), abi.encode(uint256(2000 * 1e8)));
 
         // users[0] borrows DAI
         vm.prank(users[0]);
-        pool.borrow({
+        POOL.borrow({
             asset: DAI, amount: 1500 * 1e18, interestRateMode: INTEREST_RATE_MODE, referralCode: 0, onBehalfOf: users[0]
         });
 
@@ -73,11 +73,11 @@ contract AaveTest is Test {
 
         // users[0] hf < 0.95
         skip(1);
-        assertLt(get_hf(), 0.95 * 1e18, "hf >= 0.95");
+        assertLt(getHf(), 0.95 * 1e18, "hf >= 0.95");
 
         // users[1] liquidates users[0], repay 999 DAI
         vm.prank(users[1]);
-        pool.liquidationCall({
+        POOL.liquidationCall({
             collateralAsset: WETH, debtAsset: DAI, user: users[0], debtToCover: type(uint256).max, receiveAToken: false
         });
     }

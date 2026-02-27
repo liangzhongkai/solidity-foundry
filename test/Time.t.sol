@@ -45,7 +45,6 @@ contract TimeTest is Test {
     }
 
     function testBlockNumber() public {
-        uint256 b = block.number;
         // set block number to 11
         vm.roll(11);
         assertEq(block.number, 11);

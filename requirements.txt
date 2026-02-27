@@ -1,3 +1,8 @@
 # For DifferentialTest.t.sol FFI (exp.py)
 eth-abi>=4.0.0
 vyper==0.4.3
+
+# Security analysis tools
+slither-analyzer>=0.10.0
+manticore>=0.3.7
+crytic-compile>=0.3.0

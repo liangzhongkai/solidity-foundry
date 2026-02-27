@@ -43,7 +43,26 @@ jobs:
         run: forge fmt --check
 
       - name: Run Forge build
-        run: forge build --sizes
+        run: forge build --sizes --build-info
 
       - name: Run Forge tests
         run: forge test -vvv --ffi
+
+      - name: Slither (静态分析)
+        run: slither . --config-file slither.config.json --fail-high
+
+      - name: Echidna (模糊测试)
+        uses: crytic/echidna-action@v2
+        with:
+          files: .
+          contract: CounterEchidna
+          config: echidna.yaml
+          crytic-args: --ignore-compile
+          test-limit: 5000
+          solc-version: "0.8.20"
+
+      - name: Manticore (符号执行)
+        run: |
+          manticore-verifier src/manticore/CounterManticore.sol \
+            --contract_name CounterManticore \
+            --timeout 300

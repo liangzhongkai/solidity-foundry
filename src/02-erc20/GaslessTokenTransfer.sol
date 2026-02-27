@@ -19,8 +19,8 @@ contract GaslessTokenTransfer {
         // Permit
         IERC20Permit(token).permit(sender, address(this), amount + fee, deadline, v, r, s);
         // Send amount to receiver
-        IERC20Permit(token).transferFrom(sender, receiver, amount);
+        require(IERC20Permit(token).transferFrom(sender, receiver, amount), "transfer failed");
         // Take fee - send fee to msg.sender
-        IERC20Permit(token).transferFrom(sender, msg.sender, fee);
+        require(IERC20Permit(token).transferFrom(sender, msg.sender, fee), "transfer failed");
     }
 }

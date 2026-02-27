@@ -37,6 +37,7 @@ contract ProductionERC20 {
         uint224 votes;
     }
     mapping(address => address) private _delegates; // slot 6
+    // slither-disable-next-line uninitialized-state -- mapping is auto-initialized in Solidity
     mapping(address => Checkpoint[]) private _delegateCheckpoints; // slot 7
 
     // Events with indexed parameters

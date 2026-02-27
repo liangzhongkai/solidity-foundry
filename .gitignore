@@ -47,5 +47,11 @@ Thumbs.db
 # Coverage
 coverage/
 
+# Echidna corpus
+echidna-corpus/
+
+# Manticore output
+mcore_*/
+
 # Broadcast logs
 broadcast/

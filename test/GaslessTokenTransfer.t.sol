@@ -52,8 +52,9 @@ contract GaslessTokenTransferTest is Test {
         uint256 gasUsedApprove = gasBeforeApprove - gasleft();
 
         uint256 gasBeforeTransfer = gasleft();
-        token.transferFrom(sender, receiver, AMOUNT);
-        token.transferFrom(sender, address(this), FEE);
+        bool success1 = token.transferFrom(sender, receiver, AMOUNT);
+        bool success2 = token.transferFrom(sender, address(this), FEE);
+        require(success1 && success2, "transfer failed");
         uint256 gasUsedTransferFrom = gasBeforeTransfer - gasleft();
 
         assertEq(token.balanceOf(sender), 0);

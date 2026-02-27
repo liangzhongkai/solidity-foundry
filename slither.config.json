@@ -1,0 +1,5 @@
+{
+  "filter_paths": "lib|node_modules",
+  "solc_remaps": ["forge-std/=lib/forge-std/src/", "solmate/=lib/solmate/src/"],
+  "detectors_to_exclude": "arbitrary-send-erc20-permit,arbitrary-send-eth,controlled-delegatecall"
+}

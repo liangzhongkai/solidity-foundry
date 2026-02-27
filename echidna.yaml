@@ -1,0 +1,25 @@
+# Echidna 模糊测试配置
+# https://github.com/crytic/echidna/wiki/Config
+
+# 测试模式: property (属性测试), assertion (断言), overflow, optimization, exploration
+testMode: property
+
+# 测试限制 - 生成的交易序列数量
+# CI 使用较多，pre-commit 使用较少
+testLimit: 5000
+
+# 序列长度 - 每次测试的交易数
+seqLen: 100
+
+# 部署器地址
+deployer: "0x30000"
+
+# 发送者地址列表
+sender: ["0x10000", "0x20000", "0x30000"]
+
+# 覆盖率
+coverage: true
+corpusDir: "echidna-corpus"
+
+# Solidity 版本 (与 foundry.toml 一致)
+solcVersion: "0.8.20"
