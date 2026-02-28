@@ -2,7 +2,8 @@ repos:
   - repo: local
     hooks:
       - id: ci-checks
-        name: CI checks (npm ci, forge fmt, build, test)
+        name: CI checks (forge fmt, build, test)
         entry: scripts/pre-commit-ci.sh
         language: system
         pass_filenames: false
+        verbose: true

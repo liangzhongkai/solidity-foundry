@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 import "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {exp} from "../src/Exp.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {Strings} from "openzeppelin-contracts/utils/Strings.sol";
 
 // FOUNDRY_FUZZ_RUNS=100 forge test --match-path test/DifferentialTest.t.sol --ffi -vvv
 

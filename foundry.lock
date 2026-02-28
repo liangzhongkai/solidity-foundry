@@ -5,6 +5,12 @@
       "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
     }
   },
+  "lib/openzeppelin-contracts": {
+    "tag": {
+      "name": "v5.4.0",
+      "rev": "c64a1edb67b6e3f4a15cca8909c9482ad33a02b0"
+    }
+  },
   "lib/solmate": {
     "rev": "89365b880c4f3c786bdd453d4b8e8fe410344a69"
   }

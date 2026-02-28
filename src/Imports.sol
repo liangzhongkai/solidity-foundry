@@ -8,7 +8,7 @@ contract MyERC20 is ERC20 {
     }
 }
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
 
 contract TestOwnable is Ownable {
     constructor() Ownable(msg.sender) {}
