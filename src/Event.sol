@@ -1,5 +1,8 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+/// @title Event
+/// @notice Demo contract for emitting Transfer events
 contract Event {
     event Transfer(address indexed from, address indexed to, uint256 amount);
 

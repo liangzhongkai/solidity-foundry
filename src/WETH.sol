@@ -1,5 +1,9 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+/// @title WETH - Wrapped Ether
+/// @notice ERC20-like token backed 1:1 by Ether
+/// @dev Simplified WETH implementation for demo
 contract WETH {
     string public name = "Wrapped Ether";
     string public symbol = "WETH";

@@ -3,6 +3,8 @@ pragma solidity 0.8.20;
 
 import {IERC20} from "./IERC20.sol";
 
+/// @title ERC20
+/// @notice Minimal ERC20 implementation
 contract ERC20 is IERC20 {
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;

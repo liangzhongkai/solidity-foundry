@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "forge-std/Test.sol";
-import "forge-std/console.sol";
-import "../src/02-erc20/IERC20.sol";
+import {Test} from "forge-std@1.14.0/Test.sol";
+import {console} from "forge-std@1.14.0/console.sol";
+import {IERC20} from "../src/02-erc20/IERC20.sol";
 
 // forge test \
 // --fork-url https://ethereum.publicnode.com   \

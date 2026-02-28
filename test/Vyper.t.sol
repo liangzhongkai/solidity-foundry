@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "forge-std/Test.sol";
-import "../lib/utils/VyperDeployer.sol";
-import "../src/IVyperStorage.sol";
+import {Test} from "forge-std@1.14.0/Test.sol";
+import {VyperDeployer} from "../lib/utils/VyperDeployer.sol";
+import {IVyperStorage} from "../src/IVyperStorage.sol";
 
 // source venv/bin/activate
 // forge test --match-path test/Vyper.t.sol --ffi

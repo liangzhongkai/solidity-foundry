@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
+/// @title IERC20Permit
+/// @notice ERC20 interface with EIP-2612 permit
 interface IERC20Permit {
     function totalSupply() external view returns (uint256);
     function balanceOf(address account) external view returns (uint256);

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "forge-std/Test.sol";
-import "forge-std/console.sol";
+import {Test} from "forge-std@1.14.0/Test.sol";
+import {console} from "forge-std@1.14.0/console.sol";
 
-import "../src/02-erc20/ERC20Permit.sol";
-import "../src/02-erc20/GaslessTokenTransfer.sol";
+import {ERC20Permit} from "../src/02-erc20/ERC20Permit.sol";
+import {GaslessTokenTransfer} from "../src/02-erc20/GaslessTokenTransfer.sol";
 
 contract GaslessTokenTransferTest is Test {
     ERC20Permit private token;
@@ -85,21 +85,6 @@ contract GaslessTokenTransferTest is Test {
         console.log("");
         console.log("User saves (gasless for user):     ", gasUsedApprove);
         console.log("Relayer: gasless combines permit+transfer, single tx");
-
-        // 视角	                 Traditional	                         Gasless
-        // 用户（代币持有者）	  必须发 approve 交易，支付 ~34,649 gas	   不发交易，0 gas
-        // Relayer	            ~59,467 gas	                            ~105,864 gas
-        // 系统总 gas	         ~94,116                             	~105,864（略高）
-        // ------------------------------------------------------------
-        // 为什么叫 Gasless？
-        // 用户：不需要持有 ETH，不需要发任何交易，只做链下签名
-        // Relayer：替用户支付全部 gas，并可能从 fee 中收回成本
-        // 所以 "gasless" 指的是用户侧免 gas，而不是总 gas 更少。总 gas 反而略高，因为多了 ECDSA 签名验证。
-        // ------------------------------------------------------------
-        // 适用场景
-        // 用户只有 ERC20，没有 ETH 付 gas
-        // 用户不想管理 gas，由项目方/relayer 代付
-        // 批量操作时，relayer 可以合并多笔转账，摊薄单笔成本
     }
 
     function _getPermitHash(address owner, address spender, uint256 value, uint256 nonce, uint256 deadline)

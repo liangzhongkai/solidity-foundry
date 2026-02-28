@@ -1,8 +1,10 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {console} from "forge-std/console.sol";
+import {console} from "forge-std@1.14.0/console.sol";
 
+/// @title Counter
+/// @notice Simple counter with increment/decrement
 contract Counter {
     uint256 public number;
 

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std@1.14.0/Test.sol";
 
-import "../src/07-foundry-nft/FoundryNFT.sol";
+import {FoundryNFT} from "../src/07-foundry-nft/FoundryNFT.sol";
 
 contract FoundryNFTTest is Test {
     FoundryNFT private nft;
@@ -83,7 +83,7 @@ contract FoundryNFTTest is Test {
     function test_Mint_InsufficientPaymentReverts() public {
         vm.deal(user, 1 ether);
         vm.prank(user);
-        vm.expectRevert("insufficient payment");
+        vm.expectRevert(FoundryNFT.InsufficientPayment.selector);
         nft.mint{value: 0.001 ether}();
     }
 

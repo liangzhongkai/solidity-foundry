@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "forge-std/Test.sol";
+import {Test} from "forge-std@1.14.0/Test.sol";
 import {Bit} from "../src/Bit.sol";
 
 // forge test --match-path test/Fuzz.t.sol
