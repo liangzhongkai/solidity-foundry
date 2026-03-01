@@ -28,7 +28,9 @@ contract WETH {
 
     function withdraw(uint256 wad) public {
         balanceOf[msg.sender] -= wad;
-        payable(msg.sender).transfer(wad);
+        // Fix: Use call instead of transfer (Mistake #3)
+        (bool ok,) = msg.sender.call{value: wad}("");
+        require(ok, "transfer failed");
         emit Withdrawal(msg.sender, wad);
     }
 

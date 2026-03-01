@@ -7,6 +7,8 @@ contract Wallet {
     address payable public owner;
 
     event Deposit(address account, uint256 amount);
+    event OwnerChanged(address indexed oldOwner, address indexed newOwner);
+    event Withdrawal(address indexed to, uint256 amount);
 
     constructor() payable {
         owner = payable(msg.sender);
@@ -19,12 +21,18 @@ contract Wallet {
     /// @notice Withdraw Ether to caller (must be owner)
     function withdraw(uint256 _amount) external {
         require(msg.sender == owner, "caller is not owner in withdraw");
-        payable(msg.sender).transfer(_amount);
+        // Fix: Use call instead of transfer (Mistake #3)
+        (bool ok,) = msg.sender.call{value: _amount}("");
+        require(ok, "transfer failed");
+        emit Withdrawal(msg.sender, _amount);
     }
 
     /// @notice Transfer ownership to new address
     function setOwner(address _owner) external {
         require(msg.sender == owner, "caller is not owner in setOwner");
+        // Fix: Check for zero address (Mistake #9)
+        require(_owner != address(0), "invalid owner address");
+        emit OwnerChanged(owner, _owner);
         owner = payable(_owner);
     }
 }

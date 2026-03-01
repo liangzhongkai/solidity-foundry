@@ -9,11 +9,15 @@ pragma solidity 0.8.20;
 contract Storage {
     uint256 number;
 
+    /// @dev Fix: Added event (Mistake #13)
+    event ValueStored(uint256 oldValue, uint256 newValue);
+
     /**
      * @dev Store value in variable
      * @param num value to store
      */
     function store(uint256 num) public {
+        emit ValueStored(number, num);
         number = num;
     }
 

@@ -88,7 +88,9 @@ contract ReceiveFallbackDemo {
 
     function withdraw() external {
         require(msg.sender == owner, "not owner");
-        payable(owner).transfer(address(this).balance);
+        // Fix: Use call instead of transfer (Mistake #3)
+        (bool ok,) = owner.call{value: address(this).balance}("");
+        require(ok, "transfer failed");
     }
 
     // 辅助函数：重置标志

@@ -10,18 +10,19 @@ contract TradeTokensTest is Test {
     SkillsCoin private skillsCoin;
     RareCoin private rareCoin;
 
+    address private owner;
     address private user;
     uint256 constant AMOUNT = 1000e18;
 
     function setUp() public {
+        owner = address(this); // Test contract is the deployer/owner
         skillsCoin = new SkillsCoin();
         rareCoin = new RareCoin(address(skillsCoin));
         user = address(0x1);
     }
 
     function test_FullWorkflow() public {
-        // 1. User mints SkillsCoin to themselves
-        vm.prank(user);
+        // 1. Owner mints SkillsCoin to user (Fix: only owner can mint now)
         skillsCoin.mint(user, AMOUNT);
         assertEq(skillsCoin.balanceOf(user), AMOUNT, "user should have SkillsCoin");
 
@@ -44,16 +45,16 @@ contract TradeTokensTest is Test {
     }
 
     function test_TradeWithoutApprovalReverts() public {
-        vm.prank(user);
+        // Owner mints to user
         skillsCoin.mint(user, AMOUNT);
 
         vm.prank(user);
-        vm.expectRevert("call failed");
+        vm.expectRevert(); // SafeERC20 will revert without a specific message
         rareCoin.trade(AMOUNT);
     }
 
     function test_TradePartialAmount() public {
-        vm.prank(user);
+        // Owner mints to user
         skillsCoin.mint(user, AMOUNT);
 
         uint256 tradeAmount = AMOUNT / 2;
@@ -68,16 +69,27 @@ contract TradeTokensTest is Test {
         assertEq(skillsCoin.balanceOf(address(rareCoin)), tradeAmount, "RareCoin should hold half");
     }
 
-    function test_AnyoneCanMintSkillsCoin() public {
+    /// @dev Fix: Test that only owner can mint (Mistake #7 fix verification)
+    function test_OnlyOwnerCanMint() public {
         address alice = address(0xA11CE);
         address bob = address(0xB0B);
 
-        vm.prank(alice);
+        // Owner can mint
         skillsCoin.mint(alice, 100e18);
+        assertEq(skillsCoin.balanceOf(alice), 100e18);
+
+        // Non-owner cannot mint
         vm.prank(bob);
+        vm.expectRevert("only owner");
         skillsCoin.mint(bob, 200e18);
 
-        assertEq(skillsCoin.balanceOf(alice), 100e18);
-        assertEq(skillsCoin.balanceOf(bob), 200e18);
+        // Verify bob didn't get tokens
+        assertEq(skillsCoin.balanceOf(bob), 0);
+    }
+
+    /// @dev Test that mint to zero address is blocked (Mistake #9 fix verification)
+    function test_MintToZeroAddressReverts() public {
+        vm.expectRevert("mint to zero address");
+        skillsCoin.mint(address(0), 100e18);
     }
 }

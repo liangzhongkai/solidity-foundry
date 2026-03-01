@@ -194,9 +194,20 @@ abstract contract ERC20 {
 }
 
 contract ERC20Permit is ERC20 {
-    constructor(string memory _name, string memory _symbol, uint8 _decimals) ERC20(_name, _symbol, _decimals) {}
+    address public owner;
 
-    function mint(address to, uint256 amount) public {
+    constructor(string memory _name, string memory _symbol, uint8 _decimals) ERC20(_name, _symbol, _decimals) {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "only owner");
+        _;
+    }
+
+    /// @dev Fix: Added access control (Mistake #7)
+    function mint(address to, uint256 amount) public onlyOwner {
+        require(to != address(0), "mint to zero address");
         _mint(to, amount);
     }
 }

@@ -2,11 +2,16 @@
 pragma solidity 0.8.20;
 
 import {IERC20Permit} from "./IERC20Permit.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title GaslessTokenTransfer
 /// @notice Enables gasless token transfer via EIP-2612 permit
 /// @dev Relayer pays gas; sender signs permit
+/// @dev Fix: Using SafeERC20 for token transfers (Mistake #5)
 contract GaslessTokenTransfer {
+    using SafeERC20 for IERC20;
+
     /// @notice Execute permit-backed transfer with fee
     /// @param token ERC20 permit token address
     /// @param sender Token owner (signer)
@@ -28,9 +33,9 @@ contract GaslessTokenTransfer {
     ) external {
         // Permit
         IERC20Permit(token).permit(sender, address(this), amount + fee, deadline, v, r, s);
-        // Send amount to receiver
-        require(IERC20Permit(token).transferFrom(sender, receiver, amount), "transfer failed");
-        // Take fee - send fee to msg.sender
-        require(IERC20Permit(token).transferFrom(sender, msg.sender, fee), "transfer failed");
+        // Send amount to receiver - Fix: Use safeTransferFrom (Mistake #5)
+        IERC20(token).safeTransferFrom(sender, receiver, amount);
+        // Take fee - send fee to msg.sender - Fix: Use safeTransferFrom (Mistake #5)
+        IERC20(token).safeTransferFrom(sender, msg.sender, fee);
     }
 }

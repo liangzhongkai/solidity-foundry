@@ -10,14 +10,26 @@ import {ERC20} from "../src/02-erc20/ERC20.sol";
 // https://sepolia.etherscan.io/ 获取sepolia测试网的区块浏览器
 // $ forge script script/Token.s.sol:TokenScript --rpc-url $SEPOLIA_RPC_URL --private-key $DEV_PRIVATE_KEY --broadcast --verify -vvvv
 contract MyToken is ERC20 {
-    constructor(string memory name, string memory symbol, uint8 decimals) ERC20(name, symbol, decimals) {}
+    address public owner;
 
-    function mint(address to, uint256 amount) public {
+    constructor(string memory name, string memory symbol, uint8 decimals) ERC20(name, symbol, decimals) {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "only owner");
+        _;
+    }
+
+    /// @dev Fix: Added access control (Mistake #7)
+    function mint(address to, uint256 amount) public onlyOwner {
+        require(to != address(0), "mint to zero address");
         _mint(to, amount);
     }
 
-    function burn(address from, uint256 amount) public {
-        _burn(from, amount);
+    /// @dev Fix: Changed to only burn from msg.sender (Mistake #7)
+    function burn(uint256 amount) public {
+        _burn(msg.sender, amount);
     }
 }
 
