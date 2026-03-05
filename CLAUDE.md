@@ -93,3 +93,28 @@ The CI pipeline and pre-commit hooks run:
 - **Slither** - Static analysis (`slither . --config-file slither.config.json --fail-high`)
 - **Echidna** - Fuzzing (`echidna-test . --contract CounterEchidna --config echidna.yaml`)
 - **Manticore** - Symbolic execution (`manticore-verifier src/manticore/CounterManticore.sol`)
+
+## Solidity Style Guide (Condensed)
+
+Follow project consistency first; when unsure, follow Solidity style guide defaults:
+
+- **Formatting**: 4 spaces, no tabs, max line length 120, UTF-8/ASCII source files.
+- **Top-level order**: `pragma` -> `import` -> events/errors/interfaces/libraries/contracts.
+- **In-contract order**: types -> state vars -> events -> errors -> modifiers -> functions.
+- **Function order**: constructor -> `receive` -> `fallback` -> `external` -> `public` -> `internal` -> `private` (`view`/`pure` last within a visibility group).
+- **Function modifiers order**: visibility -> mutability -> `virtual` -> `override` -> custom modifiers.
+- **Naming**:
+  - Contracts/Libraries/Structs/Events/Enums: `CapWords`
+  - Functions/Variables/Arguments/Modifiers: `mixedCase`
+  - Constants: `UPPER_CASE_WITH_UNDERSCORES`
+  - Internal/private helpers may use leading underscore (`_helper`).
+- **Whitespace and layout**:
+  - One space around operators; no extra spaces inside `()`, `[]`, `{}`.
+  - Opening brace on declaration line; closing brace on its own line.
+  - `else`/`else if` on same line as prior closing brace.
+  - `mapping` has no space before `(`, and array types use `uint[]` (not `uint []`).
+- **Strings**: prefer double quotes.
+- **Docs**: add NatSpec for public/external ABI-facing functions.
+- **Practical rule**: run `forge fmt` before commit; keep style consistent within each file/module.
+
+Reference: https://docs.soliditylang.org/en/latest/style-guide.html
