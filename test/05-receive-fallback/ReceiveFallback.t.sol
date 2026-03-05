@@ -8,7 +8,7 @@ import {
     OnlyFallback,
     NeitherReceiveNorFallback,
     CallTarget
-} from "../src/05-receive-fallback/ReceiveFallback.sol";
+} from "../../src/05-receive-fallback/ReceiveFallback.sol";
 
 contract ReceiveFallbackTest is Test {
     ReceiveFallbackDemo public demo;

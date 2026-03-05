@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {console} from "forge-std@1.14.0/console.sol";
-import {MappingSlot} from "../src/03-mapping-slot/MappingSlot.sol";
+import {MappingSlot} from "../../src/03-mapping-slot/MappingSlot.sol";
 
 contract MappingSlotTest is Test {
     MappingSlot public mappingSlot;

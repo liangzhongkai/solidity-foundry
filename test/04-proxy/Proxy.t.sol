@@ -3,8 +3,8 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {console} from "forge-std@1.14.0/console.sol";
-import {Proxy, AdminUpgradeabilityProxy} from "../src/04-proxy/Proxy.sol";
-import {CounterV1, CounterV2, BrokenCounter} from "../src/04-proxy/Counter.sol";
+import {Proxy, AdminUpgradeabilityProxy} from "../../src/04-proxy/Proxy.sol";
+import {CounterV1, CounterV2, BrokenCounter} from "../../src/04-proxy/Counter.sol";
 
 interface ICounterV1 {
     function initialize(address _owner) external;

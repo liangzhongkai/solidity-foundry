@@ -3,8 +3,8 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {console} from "forge-std@1.14.0/console.sol";
-import {PackingChallenge} from "../src/01-slot-packing/PackingChallenge.sol";
-import {PackingChallengeOptimized} from "../src/01-slot-packing/PackingChallengeOptimized.sol";
+import {PackingChallenge} from "../../src/01-slot-packing/PackingChallenge.sol";
+import {PackingChallengeOptimized} from "../../src/01-slot-packing/PackingChallengeOptimized.sol";
 
 contract PackingChallengeTest is Test {
     PackingChallenge public packingChallenge;

@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
-import {ProductionERC20} from "../src/02-erc20/ProductionERC20.sol";
+import {ProductionERC20} from "../../src/02-erc20/ProductionERC20.sol";
 
 contract ProductionERC20Test is Test {
     ProductionERC20 public token;

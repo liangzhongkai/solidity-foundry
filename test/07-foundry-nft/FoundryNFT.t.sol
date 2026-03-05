@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {ERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/ERC20.sol";
 
-import {FoundryNFT} from "../src/07-foundry-nft/FoundryNFT.sol";
+import {FoundryNFT} from "../../src/07-foundry-nft/FoundryNFT.sol";
 
 /// @notice Mock ERC20 token for testing
 contract MockERC20 is ERC20 {

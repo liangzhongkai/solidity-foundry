@@ -3,8 +3,8 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
 
-import {SkillsCoin} from "../src/06-trade-tokens/SkillsCoin.sol";
-import {RareCoin} from "../src/06-trade-tokens/RareCoin.sol";
+import {SkillsCoin} from "../../src/06-trade-tokens/SkillsCoin.sol";
+import {RareCoin} from "../../src/06-trade-tokens/RareCoin.sol";
 
 contract TradeTokensTest is Test {
     SkillsCoin private skillsCoin;

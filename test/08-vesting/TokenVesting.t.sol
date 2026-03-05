@@ -5,7 +5,7 @@ import {Test} from "forge-std@1.14.0/Test.sol";
 import {ERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
 
-import {TokenVesting} from "../src/08-vesting/TokenVesting.sol";
+import {TokenVesting} from "../../src/08-vesting/TokenVesting.sol";
 
 contract MockERC20 is ERC20 {
     constructor() ERC20("Mock Token", "MTK") {

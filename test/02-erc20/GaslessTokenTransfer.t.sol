@@ -4,8 +4,8 @@ pragma solidity 0.8.20;
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {console} from "forge-std@1.14.0/console.sol";
 
-import {ERC20Permit} from "../src/02-erc20/ERC20Permit.sol";
-import {GaslessTokenTransfer} from "../src/02-erc20/GaslessTokenTransfer.sol";
+import {ERC20Permit} from "../../src/02-erc20/ERC20Permit.sol";
+import {GaslessTokenTransfer} from "../../src/02-erc20/GaslessTokenTransfer.sol";
 
 contract GaslessTokenTransferTest is Test {
     ERC20Permit private token;
