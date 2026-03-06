@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
-import {AutoDeprecation} from "../../src/10-design-patterns/AutoDeprecation.sol";
+import {AutoDeprecation} from "../../../src/10-design-patterns/security/AutoDeprecation.sol";
 
 contract AutoDeprecationTest is Test {
     AutoDeprecation internal autoDeprecation;

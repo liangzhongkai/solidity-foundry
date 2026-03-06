@@ -12,7 +12,7 @@ import {
     V2Modern,
     Observable,
     Observer
-} from "../../src/10-design-patterns/ContractManagementPatterns.sol";
+} from "../../../src/10-design-patterns/contract-management/ContractManagementPatterns.sol";
 
 contract ContractManagementPatternsTest is Test {
     function test_Decorator() public {
@@ -25,12 +25,18 @@ contract ContractManagementPatternsTest is Test {
 
     function test_Mediator() public {
         Mediator mediator = new Mediator();
-
-        vm.prank(address(this));
         mediator.registerAndReward();
 
         assertTrue(mediator.directory().isRegistered(address(this)));
-        assertEq(mediator.rewards().rewards(address(this)), 10);
+        assertEq(mediator.rewards().rewards(address(this)), mediator.REGISTRATION_REWARD());
+    }
+
+    function test_Mediator_CannotRegisterTwice() public {
+        Mediator mediator = new Mediator();
+        mediator.registerAndReward();
+
+        vm.expectRevert(Mediator.AlreadyRegistered.selector);
+        mediator.registerAndReward();
     }
 
     function test_Satellite() public {
@@ -44,12 +50,12 @@ contract ContractManagementPatternsTest is Test {
         V1Legacy v1 = new V1Legacy();
         V2Modern v2 = new V2Modern(address(v1));
 
-        v1.setMigrationTarget(address(v2));
-
         vm.deal(address(this), 1 ether);
         v1.deposit{value: 1 ether}();
 
         assertEq(v1.balances(address(this)), 1 ether);
+
+        v1.setMigrationTarget(address(v2));
 
         v2.migrate();
 
@@ -57,13 +63,35 @@ contract ContractManagementPatternsTest is Test {
         assertEq(v2.balances(address(this)), 1 ether);
     }
 
+    function test_Migration_FreezesLegacyDeposits() public {
+        V1Legacy v1 = new V1Legacy();
+        V2Modern v2 = new V2Modern(address(v1));
+
+        v1.setMigrationTarget(address(v2));
+
+        vm.expectRevert(V1Legacy.DepositsFrozen.selector);
+        v1.deposit{value: 1 ether}();
+    }
+
     function test_Observer() public {
         Observable observable = new Observable();
         Observer observer = new Observer();
 
-        observable.addObserver(address(observer));
         observable.setValue(42);
+        observer.sync(address(observable));
 
         assertEq(observer.lastSeenValue(), 42);
+        assertEq(observer.lastSyncedVersion(), 1);
+    }
+
+    function test_Observer_CannotSyncSameVersionTwice() public {
+        Observable observable = new Observable();
+        Observer observer = new Observer();
+
+        observable.setValue(42);
+        observer.sync(address(observable));
+
+        vm.expectRevert(Observer.AlreadySynced.selector);
+        observer.sync(address(observable));
     }
 }

@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
-import {PublisherSubscriber} from "../../src/10-design-patterns/PublisherSubscriber.sol";
+import {PublisherSubscriber} from "../../../src/10-design-patterns/efficiency/PublisherSubscriber.sol";
 
 contract PublisherSubscriberTest is Test {
     PublisherSubscriber internal pubsub;

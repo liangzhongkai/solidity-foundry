@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
-import {DataContract, LogicContract} from "../../src/10-design-patterns/DataLogicContract.sol";
+import {DataContract, LogicContract} from "../../../src/10-design-patterns/contract-management/DataLogicContract.sol";
 
 contract DataLogicContractTest is Test {
     DataContract internal dataContract;

@@ -2,8 +2,8 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
-import {PatternVault} from "../../src/10-design-patterns/PatternVault.sol";
-import {PatternVaultFactory} from "../../src/10-design-patterns/PatternVaultFactory.sol";
+import {PatternVault} from "../../../src/10-design-patterns/security/PatternVault.sol";
+import {PatternVaultFactory} from "../../../src/10-design-patterns/contract-management/PatternVaultFactory.sol";
 
 contract ReentrantWithdrawer {
     PatternVault public immutable vault;
@@ -153,6 +153,47 @@ contract PatternVaultTest is Test {
 
         vm.prank(user);
         vault.withdraw();
+    }
+
+    function test_ScopedPause_DepositsOnly() public {
+        vm.prank(owner);
+        vault.deposit{value: 10 ether}();
+
+        vm.prank(owner);
+        vault.setDepositPaused(true);
+
+        assertTrue(vault.paused());
+        assertTrue(vault.isDepositPaused());
+        assertFalse(vault.isQueuePaused());
+
+        vm.expectRevert(PatternVault.Paused.selector);
+        vm.prank(owner);
+        vault.deposit{value: 1 ether}();
+
+        vm.prank(operator);
+        vault.queuePayment(user, 2 ether);
+
+        vm.prank(user);
+        vault.withdraw();
+    }
+
+    function test_ScopedPause_QueueingOnly() public {
+        vm.prank(owner);
+        vault.deposit{value: 10 ether}();
+
+        vm.prank(owner);
+        vault.setQueuePaused(true);
+
+        assertTrue(vault.paused());
+        assertFalse(vault.isDepositPaused());
+        assertTrue(vault.isQueuePaused());
+
+        vm.expectRevert(PatternVault.Paused.selector);
+        vm.prank(operator);
+        vault.queuePayment(user, 1 ether);
+
+        vm.prank(owner);
+        vault.deposit{value: 1 ether}();
     }
 
     function test_EmergencySweep_OnlySurplusAfterDelay() public {

@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
-import {StateMachine} from "../../src/10-design-patterns/StateMachine.sol";
+import {StateMachine} from "../../../src/10-design-patterns/foundational/StateMachine.sol";
 
 contract StateMachineTest is Test {
     StateMachine internal stateMachine;

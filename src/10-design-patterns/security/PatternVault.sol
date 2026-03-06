@@ -5,7 +5,7 @@ pragma solidity 0.8.20;
 /// @notice Production-grade payment vault demonstrating security/perf patterns:
 /// - checks-effects-interactions
 /// - pull payment
-/// - emergency stop (pause)
+/// - scoped emergency stop with unstoppable exits
 /// - role-based access control
 /// - rate limit + balance cap
 /// - custom errors + tight storage packing
@@ -43,6 +43,7 @@ contract PatternVault {
     );
     event OperatorUpdated(address indexed operator, bool enabled);
     event PausedStateChanged(bool paused, uint64 emergencyUnlockAt);
+    event PauseFlagsUpdated(uint8 pauseFlags, uint64 emergencyUnlockAt);
     event Deposited(address indexed from, uint256 amount);
     event PaymentQueued(address indexed operator, address indexed recipient, uint256 amount);
     event Withdrawn(address indexed recipient, uint256 amount);
@@ -62,11 +63,13 @@ contract PatternVault {
 
     uint64 public epochStart;
     uint64 public emergencyUnlockAt;
-
-    bool public paused;
+    uint8 public pauseFlags;
     uint128 public spentInEpoch;
 
     uint256 private _entered;
+
+    uint8 public constant PAUSE_DEPOSITS = 1 << 0;
+    uint8 public constant PAUSE_QUEUEING = 1 << 1;
 
     // ---------------------------
     // Modifiers
@@ -81,8 +84,13 @@ contract PatternVault {
         _;
     }
 
-    modifier whenNotPaused() {
-        if (paused) revert Paused();
+    modifier whenDepositsEnabled() {
+        if (_isFlagSet(PAUSE_DEPOSITS)) revert Paused();
+        _;
+    }
+
+    modifier whenQueueingEnabled() {
+        if (_isFlagSet(PAUSE_QUEUEING)) revert Paused();
         _;
     }
 
@@ -119,21 +127,29 @@ contract PatternVault {
     }
 
     function setPaused(bool paused_) external onlyOwner {
-        if (paused == paused_) {
-            if (paused_) revert Paused();
-            revert NotPaused();
-        }
-        paused = paused_;
+        _setPauseFlags(paused_ ? PAUSE_DEPOSITS | PAUSE_QUEUEING : 0);
+    }
 
-        uint64 unlockAt = 0;
+    function setDepositPaused(bool paused_) external onlyOwner {
+        uint8 newFlags = pauseFlags;
         if (paused_) {
-            unlockAt = uint64(block.timestamp) + config.emergencyDelay;
-            emergencyUnlockAt = unlockAt;
+            newFlags |= PAUSE_DEPOSITS;
         } else {
-            emergencyUnlockAt = 0;
+            newFlags &= ~PAUSE_DEPOSITS;
         }
 
-        emit PausedStateChanged(paused_, unlockAt);
+        _setPauseFlags(newFlags);
+    }
+
+    function setQueuePaused(bool paused_) external onlyOwner {
+        uint8 newFlags = pauseFlags;
+        if (paused_) {
+            newFlags |= PAUSE_QUEUEING;
+        } else {
+            newFlags &= ~PAUSE_QUEUEING;
+        }
+
+        _setPauseFlags(newFlags);
     }
 
     // ---------------------------
@@ -147,7 +163,7 @@ contract PatternVault {
         _deposit(msg.sender, msg.value);
     }
 
-    function _deposit(address from, uint256 amount) internal whenNotPaused {
+    function _deposit(address from, uint256 amount) internal whenDepositsEnabled {
         if (amount == 0) revert AmountZero();
         uint256 newBalance = address(this).balance;
         if (newBalance > config.maxBalance) revert BalanceCapExceeded(newBalance, config.maxBalance);
@@ -155,7 +171,7 @@ contract PatternVault {
     }
 
     /// @notice Queue payment credit for recipient, who later claims via withdraw().
-    function queuePayment(address recipient, uint256 amount) public onlyOperator whenNotPaused {
+    function queuePayment(address recipient, uint256 amount) public onlyOperator whenQueueingEnabled {
         if (recipient == address(0)) revert ZeroAddress();
         if (amount == 0) revert AmountZero();
 
@@ -175,7 +191,7 @@ contract PatternVault {
     function batchQueuePayment(address[] calldata recipients, uint256[] calldata amounts)
         external
         onlyOperator
-        whenNotPaused
+        whenQueueingEnabled
     {
         uint256 len = recipients.length;
         if (len == 0 || len != amounts.length) revert InvalidConfig();
@@ -201,7 +217,7 @@ contract PatternVault {
 
     /// @notice Sweeps only surplus funds (never touches owed user credits).
     function emergencySweep(address to, uint256 amount) external onlyOwner nonReentrant {
-        if (!paused) revert NotPaused();
+        if (!paused()) revert NotPaused();
         if (to == address(0)) revert ZeroAddress();
         if (block.timestamp < emergencyUnlockAt) {
             revert EmergencyDelayActive(emergencyUnlockAt, block.timestamp);
@@ -221,6 +237,18 @@ contract PatternVault {
     // ---------------------------
     function surplus() external view returns (uint256) {
         return _surplus();
+    }
+
+    function paused() public view returns (bool) {
+        return pauseFlags != 0;
+    }
+
+    function isDepositPaused() external view returns (bool) {
+        return _isFlagSet(PAUSE_DEPOSITS);
+    }
+
+    function isQueuePaused() external view returns (bool) {
+        return _isFlagSet(PAUSE_QUEUEING);
     }
 
     function _surplus() internal view returns (uint256) {
@@ -245,5 +273,29 @@ contract PatternVault {
             revert EpochLimitExceeded(amount, limit - spentInEpoch);
         }
         spentInEpoch = uint128(newSpent);
+    }
+
+    function _setPauseFlags(uint8 newFlags) internal {
+        if (pauseFlags == newFlags) {
+            if (newFlags != 0) revert Paused();
+            revert NotPaused();
+        }
+
+        pauseFlags = newFlags;
+
+        uint64 unlockAt = 0;
+        if (newFlags != 0) {
+            unlockAt = uint64(block.timestamp) + config.emergencyDelay;
+            emergencyUnlockAt = unlockAt;
+        } else {
+            emergencyUnlockAt = 0;
+        }
+
+        emit PausedStateChanged(newFlags != 0, unlockAt);
+        emit PauseFlagsUpdated(newFlags, unlockAt);
+    }
+
+    function _isFlagSet(uint8 flag) internal view returns (bool) {
+        return (pauseFlags & flag) != 0;
     }
 }

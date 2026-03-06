@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
-import {MultiSigWallet} from "../../src/10-design-patterns/MultiSigWallet.sol";
+import {MultiSigWallet} from "../../../src/10-design-patterns/access-control/MultiSigWallet.sol";
 
 contract MultiSigWalletTest is Test {
     MultiSigWallet internal wallet;

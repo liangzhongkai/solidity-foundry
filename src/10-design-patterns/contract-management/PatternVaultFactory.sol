@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Clones} from "openzeppelin-contracts@5.4.0/proxy/Clones.sol";
-import {PatternVault} from "./PatternVault.sol";
+import {PatternVault} from "../security/PatternVault.sol";
 
 /// @title PatternVaultFactory
 /// @notice Contract-management pattern using EIP-1167 minimal proxies.

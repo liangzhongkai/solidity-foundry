@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
-import {IncentiveExecution} from "../../src/10-design-patterns/IncentiveExecution.sol";
+import {IncentiveExecution} from "../../../src/10-design-patterns/efficiency/IncentiveExecution.sol";
 
 contract IncentiveExecutionTest is Test {
     IncentiveExecution internal incentiveExecution;
