@@ -49,6 +49,7 @@ coverage/
 
 # Echidna corpus
 echidna-corpus/
+crytic-export/
 
 # Manticore output
 mcore_*/

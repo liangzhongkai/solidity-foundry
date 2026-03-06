@@ -25,7 +25,7 @@ contract CounterEchidna {
     }
 
     /// @notice 不变式: number 始终为有效 uint256 (无下溢)
-    function echidna_number_valid() public view returns (bool) {
+    function echidna_number_valid() public pure returns (bool) {
         return true; // uint256 不会下溢
     }
 

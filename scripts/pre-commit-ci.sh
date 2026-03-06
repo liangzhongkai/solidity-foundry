@@ -33,8 +33,9 @@ if command -v echidna-test &>/dev/null; then
   echidna-test . \
     --contract CounterEchidna \
     --config echidna.yaml \
-    --crytic-args "--ignore-compile" \
-    --test-limit 500
+    --test-limit 500 \
+    --format text \
+    --disable-slither
 else
   echo "[6/6] Skipping Echidna (echidna-test not in PATH)"
 fi

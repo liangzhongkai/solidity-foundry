@@ -21,5 +21,3 @@ sender: ["0x10000", "0x20000", "0x30000"]
 coverage: true
 corpusDir: "echidna-corpus"
 
-# Solidity 版本 (与 foundry.toml 一致)
-solcVersion: "0.8.20"
