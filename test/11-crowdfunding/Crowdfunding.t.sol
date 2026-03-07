@@ -14,21 +14,82 @@ contract MockERC20 is ERC20 {
     }
 }
 
+contract FeeOnTransferERC20 is ERC20 {
+    address internal immutable feeCollector;
+
+    constructor(string memory name_, string memory symbol_, address feeCollector_) ERC20(name_, symbol_) {
+        feeCollector = feeCollector_;
+    }
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        if (from == address(0) || to == address(0) || value == 0) {
+            super._update(from, to, value);
+            return;
+        }
+
+        uint256 fee = value / 10;
+        uint256 netAmount = value - fee;
+
+        super._update(from, feeCollector, fee);
+        super._update(from, to, netAmount);
+    }
+}
+
+contract OutboundFeeERC20 is ERC20 {
+    address internal immutable feeCollector;
+    address internal taxedSender;
+
+    constructor(string memory name_, string memory symbol_, address feeCollector_) ERC20(name_, symbol_) {
+        feeCollector = feeCollector_;
+    }
+
+    function setTaxedSender(address taxedSender_) external {
+        taxedSender = taxedSender_;
+    }
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        if (from == address(0) || to == address(0) || value == 0 || from != taxedSender) {
+            super._update(from, to, value);
+            return;
+        }
+
+        uint256 fee = value / 10;
+        uint256 netAmount = value - fee;
+
+        super._update(from, feeCollector, fee);
+        super._update(from, to, netAmount);
+    }
+}
+
 contract CrowdfundingTest is Test {
     Crowdfunding internal crowdfunding;
     MockERC20 internal tokenA;
     MockERC20 internal tokenB;
+    FeeOnTransferERC20 internal feeToken;
+    OutboundFeeERC20 internal outboundFeeToken;
 
     address internal creatorA = address(0xA1);
     address internal creatorB = address(0xB2);
     address internal donorA = address(0xD1);
     address internal donorB = address(0xD2);
     address internal outsider = address(0xEE);
+    address internal feeCollector = address(0xFEE);
 
     function setUp() public {
         crowdfunding = new Crowdfunding();
         tokenA = new MockERC20("Token A", "TKA");
         tokenB = new MockERC20("Token B", "TKB");
+        feeToken = new FeeOnTransferERC20("Fee Token", "FEE", feeCollector);
+        outboundFeeToken = new OutboundFeeERC20("Outbound Fee Token", "OFT", feeCollector);
+        outboundFeeToken.setTaxedSender(address(crowdfunding));
 
         vm.deal(creatorA, 10 ether);
         vm.deal(creatorB, 10 ether);
@@ -40,6 +101,10 @@ contract CrowdfundingTest is Test {
         tokenA.mint(donorB, 1000e18);
         tokenB.mint(donorA, 1000e18);
         tokenB.mint(donorB, 1000e18);
+        feeToken.mint(donorA, 1000e18);
+        feeToken.mint(donorB, 1000e18);
+        outboundFeeToken.mint(donorA, 1000e18);
+        outboundFeeToken.mint(donorB, 1000e18);
     }
 
     function test_CreateEthFundraiser_SetsFields() public {
@@ -273,6 +338,24 @@ contract CrowdfundingTest is Test {
         crowdfunding.refund(fundraiserId);
     }
 
+    function test_Refund_AtDeadlineSucceeds() public {
+        uint256 deadline = block.timestamp + 1 days;
+        uint256 fundraiserId = _createEthFundraiser(creatorA, 5 ether, deadline);
+
+        vm.prank(donorA);
+        crowdfunding.donate{value: 1 ether}(fundraiserId);
+
+        vm.warp(deadline);
+
+        uint256 donorBalanceBefore = donorA.balance;
+
+        vm.prank(donorA);
+        crowdfunding.refund(fundraiserId);
+
+        assertEq(donorA.balance, donorBalanceBefore + 1 ether);
+        assertEq(crowdfunding.donationOf(fundraiserId, donorA), 0);
+    }
+
     function test_Donate_AfterDeadlineReverts() public {
         uint256 deadline = block.timestamp + 1 days;
         uint256 fundraiserId = _createTokenFundraiser(creatorA, address(tokenA), 100e18, deadline);
@@ -284,6 +367,88 @@ contract CrowdfundingTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Crowdfunding.FundraiserEnded.selector, deadline + 1, deadline));
         crowdfunding.donate(fundraiserId, 100e18);
         vm.stopPrank();
+    }
+
+    function test_Donate_AtDeadlineReverts() public {
+        uint256 deadline = block.timestamp + 1 days;
+        uint256 fundraiserId = _createEthFundraiser(creatorA, 5 ether, deadline);
+
+        vm.warp(deadline);
+
+        vm.prank(donorA);
+        vm.expectRevert(abi.encodeWithSelector(Crowdfunding.FundraiserEnded.selector, deadline, deadline));
+        crowdfunding.donate{value: 1 ether}(fundraiserId);
+    }
+
+    function test_Donate_AfterCreatorWithdrawalReverts() public {
+        uint256 fundraiserId = _createEthFundraiser(creatorA, 1 ether, block.timestamp + 7 days);
+
+        vm.prank(donorA);
+        crowdfunding.donate{value: 1 ether}(fundraiserId);
+
+        vm.prank(creatorA);
+        crowdfunding.withdraw(fundraiserId);
+
+        vm.prank(donorB);
+        vm.expectRevert(Crowdfunding.FundraiserClosed.selector);
+        crowdfunding.donate{value: 1 ether}(fundraiserId);
+    }
+
+    function test_Erc20Donate_FeeOnTransferTokenReverts() public {
+        uint256 fundraiserId = _createTokenFundraiser(creatorA, address(feeToken), 100e18, block.timestamp + 7 days);
+
+        vm.startPrank(donorA);
+        feeToken.approve(address(crowdfunding), 100e18);
+        vm.expectRevert(abi.encodeWithSelector(Crowdfunding.UnsupportedTokenTransfer.selector, 100e18, 90e18));
+        crowdfunding.donate(fundraiserId, 100e18);
+        vm.stopPrank();
+
+        assertEq(crowdfunding.donationOf(fundraiserId, donorA), 0);
+        (,,,, uint256 totalRaised,) = crowdfunding.fundraisers(fundraiserId);
+        assertEq(totalRaised, 0);
+        assertEq(feeToken.balanceOf(address(crowdfunding)), 0);
+        assertEq(feeToken.balanceOf(feeCollector), 0);
+    }
+
+    function test_Erc20Withdraw_OutboundFeeTokenReverts() public {
+        uint256 fundraiserId =
+            _createTokenFundraiser(creatorA, address(outboundFeeToken), 100e18, block.timestamp + 7 days);
+
+        vm.startPrank(donorA);
+        outboundFeeToken.approve(address(crowdfunding), 100e18);
+        crowdfunding.donate(fundraiserId, 100e18);
+        vm.stopPrank();
+
+        vm.prank(creatorA);
+        vm.expectRevert(abi.encodeWithSelector(Crowdfunding.UnsupportedTokenTransfer.selector, 100e18, 90e18));
+        crowdfunding.withdraw(fundraiserId);
+
+        (,,,,, bool withdrawn) = crowdfunding.fundraisers(fundraiserId);
+        assertFalse(withdrawn);
+        assertEq(outboundFeeToken.balanceOf(address(crowdfunding)), 100e18);
+        assertEq(outboundFeeToken.balanceOf(creatorA), 0);
+        assertEq(outboundFeeToken.balanceOf(feeCollector), 0);
+    }
+
+    function test_Erc20Refund_OutboundFeeTokenReverts() public {
+        uint256 fundraiserId =
+            _createTokenFundraiser(creatorA, address(outboundFeeToken), 200e18, block.timestamp + 1 days);
+
+        vm.startPrank(donorA);
+        outboundFeeToken.approve(address(crowdfunding), 100e18);
+        crowdfunding.donate(fundraiserId, 100e18);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 1 days);
+
+        vm.prank(donorA);
+        vm.expectRevert(abi.encodeWithSelector(Crowdfunding.UnsupportedTokenTransfer.selector, 100e18, 90e18));
+        crowdfunding.refund(fundraiserId);
+
+        assertEq(crowdfunding.donationOf(fundraiserId, donorA), 100e18);
+        assertEq(outboundFeeToken.balanceOf(address(crowdfunding)), 100e18);
+        assertEq(outboundFeeToken.balanceOf(donorA), 900e18);
+        assertEq(outboundFeeToken.balanceOf(feeCollector), 0);
     }
 
     function _createEthFundraiser(address creator, uint256 goal, uint256 deadline)
