@@ -5,13 +5,25 @@ import {Test} from "forge-std@1.14.0/Test.sol";
 import {
     EscrowJudge,
     EmbeddedPermission,
-    DynamicBinding
+    DynamicBinding,
+    TransparentBinding,
+    UUPSBinding,
+    UUPSUpgradeableDemo
 } from "../../../src/10-design-patterns/access-control/AccessControlPatterns.sol";
 
 interface IProxyLogic {
     function val() external view returns (uint256);
     function setVal(uint256 _val) external;
     function version() external view returns (uint256);
+}
+
+interface IUUPSProxyLogic is IProxyLogic {
+    function owner() external view returns (address);
+    function initialize(address owner_) external;
+}
+
+interface IUUPSUpgrade {
+    function upgradeTo(address newImplementation, bytes calldata initData) external;
 }
 
 contract MockLogicV1 is IProxyLogic {
@@ -34,6 +46,41 @@ contract MockLogicV2 is IProxyLogic {
     }
 
     function version() external pure returns (uint256) {
+        return 2;
+    }
+}
+
+contract MockUUPSLogicV1 is UUPSUpgradeableDemo, IUUPSProxyLogic {
+    uint256 public val;
+    address public owner;
+
+    error AlreadyInitialized();
+    error Unauthorized();
+
+    function initialize(address owner_) external {
+        if (owner != address(0)) revert AlreadyInitialized();
+        owner = owner_;
+    }
+
+    function setVal(uint256 _val) external virtual {
+        val = _val;
+    }
+
+    function version() external pure virtual returns (uint256) {
+        return 1;
+    }
+
+    function _authorizeUpgrade(address caller) internal view override {
+        if (caller != owner) revert Unauthorized();
+    }
+}
+
+contract MockUUPSLogicV2 is MockUUPSLogicV1 {
+    function setVal(uint256 _val) external override {
+        val = _val + 1;
+    }
+
+    function version() external pure override returns (uint256) {
         return 2;
     }
 }
@@ -68,8 +115,12 @@ contract AccessControlPatternsTest is Test {
     EscrowJudge internal escrow;
     EmbeddedPermission internal perm;
     DynamicBinding internal proxy;
+    TransparentBinding internal transparentProxy;
+    UUPSBinding internal uupsProxy;
     MockLogicV1 internal logic1;
     MockLogicV2 internal logic2;
+    MockUUPSLogicV1 internal uupsLogic1;
+    MockUUPSLogicV2 internal uupsLogic2;
     Mock1271Signer internal contractSigner;
 
     address internal buyer = address(0x1);
@@ -89,6 +140,11 @@ contract AccessControlPatternsTest is Test {
         logic1 = new MockLogicV1();
         logic2 = new MockLogicV2();
         proxy = new DynamicBinding(address(this), address(logic1), "");
+        transparentProxy = new TransparentBinding(address(this), address(logic1), "");
+
+        uupsLogic1 = new MockUUPSLogicV1();
+        uupsLogic2 = new MockUUPSLogicV2();
+        uupsProxy = new UUPSBinding(address(uupsLogic1), abi.encodeCall(MockUUPSLogicV1.initialize, (address(this))));
     }
 
     function test_EscrowHappyPath() public {
@@ -195,5 +251,61 @@ contract AccessControlPatternsTest is Test {
         vm.prank(buyer);
         vm.expectRevert(DynamicBinding.Unauthorized.selector);
         proxy.upgradeTo(address(logic2), "");
+    }
+
+    function test_TransparentBinding() public {
+        IProxyLogic proxied = IProxyLogic(address(transparentProxy));
+
+        vm.startPrank(buyer);
+        proxied.setVal(100);
+        assertEq(proxied.val(), 100);
+        assertEq(proxied.version(), 1);
+        vm.stopPrank();
+
+        transparentProxy.upgradeTo(address(logic2), "");
+
+        vm.startPrank(buyer);
+        assertEq(proxied.val(), 100);
+        proxied.setVal(200);
+        assertEq(proxied.val(), 201);
+        assertEq(proxied.version(), 2);
+        vm.stopPrank();
+    }
+
+    function test_TransparentBinding_AdminCannotCallImplementation() public {
+        vm.expectRevert(TransparentBinding.AdminCannotFallback.selector);
+        IProxyLogic(address(transparentProxy)).version();
+    }
+
+    function test_TransparentBinding_OnlyAdminCanUpgrade() public {
+        vm.prank(buyer);
+        vm.expectRevert(TransparentBinding.Unauthorized.selector);
+        transparentProxy.upgradeTo(address(logic2), "");
+    }
+
+    function test_UUPSBinding() public {
+        IUUPSProxyLogic proxied = IUUPSProxyLogic(address(uupsProxy));
+        proxied.setVal(100);
+        assertEq(proxied.val(), 100);
+        assertEq(proxied.version(), 1);
+        assertEq(proxied.owner(), address(this));
+
+        IUUPSUpgrade(address(uupsProxy)).upgradeTo(address(uupsLogic2), "");
+
+        assertEq(proxied.val(), 100);
+        proxied.setVal(200);
+        assertEq(proxied.val(), 201);
+        assertEq(proxied.version(), 2);
+    }
+
+    function test_UUPSBinding_OnlyOwnerCanUpgrade() public {
+        vm.prank(buyer);
+        vm.expectRevert(MockUUPSLogicV1.Unauthorized.selector);
+        IUUPSUpgrade(address(uupsProxy)).upgradeTo(address(uupsLogic2), "");
+    }
+
+    function test_UUPSBinding_ImplementationCannotUpgradeDirectly() public {
+        vm.expectRevert(UUPSUpgradeableDemo.UUPSOnlyProxy.selector);
+        uupsLogic1.upgradeTo(address(uupsLogic2), "");
     }
 }

@@ -155,56 +155,21 @@ contract EmbeddedPermission is EIP712 {
 
 /// @title DynamicBinding
 /// @notice Modernized dynamic binding using EIP-1967-style storage slots for upgrades.
-contract DynamicBinding {
-    bytes32 private constant IMPLEMENTATION_SLOT = bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1);
-    bytes32 private constant ADMIN_SLOT = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
+interface IERC1822ProxiableDemo {
+    function proxiableUUID() external view returns (bytes32);
+}
+
+/// @notice Shared storage slots used by all three upgrade patterns in this teaching example.
+/// The differences below are about where upgrade authority lives and whether the admin may hit fallback.
+abstract contract ERC1967Slots {
+    bytes32 internal constant IMPLEMENTATION_SLOT = bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1);
+    bytes32 internal constant ADMIN_SLOT = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
 
     event Upgraded(address indexed implementation);
     event AdminChanged(address indexed admin);
 
-    error Unauthorized();
     error ZeroAddress();
     error UpgradeFailed();
-
-    constructor(address admin_, address implementation_, bytes memory initData) payable {
-        if (admin_ == address(0) || implementation_ == address(0)) revert ZeroAddress();
-
-        _setAdmin(admin_);
-        _setImplementation(implementation_);
-
-        if (initData.length != 0) {
-            (bool ok,) = implementation_.delegatecall(initData);
-            if (!ok) revert UpgradeFailed();
-        }
-    }
-
-    function admin() external view returns (address admin_) {
-        admin_ = _getAdmin();
-    }
-
-    function implementation() external view returns (address implementation_) {
-        implementation_ = _getImplementation();
-    }
-
-    function upgradeTo(address newImplementation, bytes calldata initData) external {
-        if (msg.sender != _getAdmin()) revert Unauthorized();
-        if (newImplementation == address(0)) revert ZeroAddress();
-
-        _setImplementation(newImplementation);
-
-        if (initData.length != 0) {
-            (bool ok,) = newImplementation.delegatecall(initData);
-            if (!ok) revert UpgradeFailed();
-        }
-    }
-
-    fallback() external payable {
-        _delegate(_getImplementation());
-    }
-
-    receive() external payable {
-        _delegate(_getImplementation());
-    }
 
     function _delegate(address target) internal {
         assembly {
@@ -214,6 +179,16 @@ contract DynamicBinding {
             switch result
             case 0 { revert(0, returndatasize()) }
             default { return(0, returndatasize()) }
+        }
+    }
+
+    function _upgradeToAndCall(address newImplementation, bytes memory initData) internal {
+        if (newImplementation == address(0)) revert ZeroAddress();
+        _setImplementation(newImplementation);
+
+        if (initData.length != 0) {
+            (bool ok,) = newImplementation.delegatecall(initData);
+            if (!ok) revert UpgradeFailed();
         }
     }
 
@@ -249,3 +224,154 @@ contract DynamicBinding {
         emit Upgraded(implementation_);
     }
 }
+
+contract DynamicBinding is ERC1967Slots {
+    error Unauthorized();
+
+    constructor(address admin_, address implementation_, bytes memory initData) payable {
+        if (admin_ == address(0) || implementation_ == address(0)) revert ZeroAddress();
+
+        _setAdmin(admin_);
+        _upgradeToAndCall(implementation_, initData);
+    }
+
+    function admin() external view returns (address admin_) {
+        admin_ = _getAdmin();
+    }
+
+    function implementation() external view returns (address implementation_) {
+        implementation_ = _getImplementation();
+    }
+
+    function upgradeTo(address newImplementation, bytes calldata initData) external {
+        if (msg.sender != _getAdmin()) revert Unauthorized();
+        _upgradeToAndCall(newImplementation, initData);
+    }
+
+    fallback() external payable {
+        _delegate(_getImplementation());
+    }
+
+    receive() external payable {
+        _delegate(_getImplementation());
+    }
+}
+
+/// @title TransparentBinding
+/// @notice Transparent proxy variant where the admin can upgrade but cannot fallback into implementation logic.
+contract TransparentBinding is ERC1967Slots {
+    error Unauthorized();
+    error AdminCannotFallback();
+
+    constructor(address admin_, address implementation_, bytes memory initData) payable {
+        if (admin_ == address(0) || implementation_ == address(0)) revert ZeroAddress();
+
+        _setAdmin(admin_);
+        _upgradeToAndCall(implementation_, initData);
+    }
+
+    function admin() external view returns (address admin_) {
+        admin_ = _getAdmin();
+    }
+
+    function implementation() external view returns (address implementation_) {
+        implementation_ = _getImplementation();
+    }
+
+    function upgradeTo(address newImplementation, bytes calldata initData) external {
+        if (msg.sender != _getAdmin()) revert Unauthorized();
+        _upgradeToAndCall(newImplementation, initData);
+    }
+
+    // Transparency rule: the admin can manage upgrades, but must not execute user logic through the proxy.
+    fallback() external payable {
+        if (msg.sender == _getAdmin()) revert AdminCannotFallback();
+        _delegate(_getImplementation());
+    }
+
+    receive() external payable {
+        if (msg.sender == _getAdmin()) revert AdminCannotFallback();
+        _delegate(_getImplementation());
+    }
+}
+
+/// @title UUPSBinding
+/// @notice Minimal ERC1967 proxy shell used by UUPS implementations.
+/// Unlike DynamicBinding/TransparentBinding, this proxy has no external upgrade function.
+contract UUPSBinding is ERC1967Slots {
+    constructor(address implementation_, bytes memory initData) payable {
+        if (implementation_ == address(0)) revert ZeroAddress();
+        _upgradeToAndCall(implementation_, initData);
+    }
+
+    function implementation() external view returns (address implementation_) {
+        implementation_ = _getImplementation();
+    }
+
+    fallback() external payable {
+        _delegate(_getImplementation());
+    }
+
+    receive() external payable {
+        _delegate(_getImplementation());
+    }
+}
+
+/// @title UUPSUpgradeableDemo
+/// @notice Minimal UUPS implementation mixin. The proxy is dumb; the implementation owns the upgrade path.
+abstract contract UUPSUpgradeableDemo is ERC1967Slots, IERC1822ProxiableDemo {
+    address private immutable SELF = address(this);
+
+    error UUPSOnlyProxy();
+    error UUPSNotDelegated();
+    error UUPSUnsupportedUUID(bytes32 slot);
+    error InvalidUUPSImplementation();
+
+    modifier onlyProxy() {
+        if (address(this) == SELF || _getImplementation() != SELF) revert UUPSOnlyProxy();
+        _;
+    }
+
+    modifier notDelegated() {
+        if (address(this) != SELF) revert UUPSNotDelegated();
+        _;
+    }
+
+    function proxiableUUID() external view notDelegated returns (bytes32) {
+        return IMPLEMENTATION_SLOT;
+    }
+
+    // In UUPS, callers reach this function through the proxy, so storage writes still land in the proxy.
+    function upgradeTo(address newImplementation, bytes calldata initData) external onlyProxy {
+        _authorizeUpgrade(msg.sender);
+
+        try IERC1822ProxiableDemo(newImplementation).proxiableUUID() returns (bytes32 slot) {
+            if (slot != IMPLEMENTATION_SLOT) revert UUPSUnsupportedUUID(slot);
+        } catch {
+            revert InvalidUUPSImplementation();
+        }
+
+        _upgradeToAndCall(newImplementation, initData);
+    }
+
+    function _authorizeUpgrade(address caller) internal view virtual;
+}
+
+/*
+Upgrade pattern comparison in this file:
+
+1. DynamicBinding
+   - Upgrade entrypoint lives on the proxy itself.
+   - Admin stored in the proxy decides upgrades.
+   - Admin may still call implementation logic through fallback.
+
+2. TransparentBinding
+   - Upgrade entrypoint also lives on the proxy itself.
+   - Admin stored in the proxy decides upgrades.
+   - Admin is blocked from fallback, so admin actions and user actions stay separated.
+
+3. UUPSBinding + UUPSUpgradeableDemo
+   - Proxy is only a thin delegatecall shell.
+   - Upgrade entrypoint lives in the implementation and is reached via delegatecall.
+   - Upgrade authorization is defined by implementation code, not by a proxy-only admin function.
+*/
