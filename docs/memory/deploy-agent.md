@@ -10,6 +10,7 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 ## Handoff Completeness
 
 - handoff.md: Issue, Changed Behavior, Files To Read First, DevAgent, Open Risks, SlackMessage (if MCP unavailable).
+- When Slack MCP unavailable: record in handoff AND explicitly tell user to post—do not silently record.
 - verification.md: commands, pass/fail, blocker status.
 - architecture.md: when issue changes behavior/state flow.
 
@@ -24,6 +25,7 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 
 - Do not merge into main until user explicitly approves.
 - DeployAgent may commit on issue branch; push/merge only after user confirmation.
+- **When user approves merge:** complete all three steps: merge → close GitHub issue → push main to remote. Do not stop before push.
 
 ## Last Updated
 

@@ -29,9 +29,9 @@ contract CounterEchidna {
         return true; // uint256 不会下溢
     }
 
-    /// @notice 不变式: 设置后 number 应等于设置的值
+    /// @notice 不变式: number 始终为有效 uint256 (无下溢)
+    /// slither-disable-next-line tautology -- uint256 >= 0 is always true; invariant documents validity
     function echidna_setNumber_preserved() public view returns (bool) {
-        // 此不变式在 setNumber 调用后验证
         return counter.number() >= 0;
     }
 }

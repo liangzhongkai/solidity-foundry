@@ -45,6 +45,7 @@ contract CounterV1 {
      */
     function initialize(address _owner) external {
         // Check if already initialized by checking if lastUpdated was set
+        // slither-disable-next-line incorrect-equality -- proxy init: lastUpdated 0 means uninitialized
         require(lastUpdated == 0, "already initialized");
         require(_owner != address(0), "invalid owner");
         owner = _owner;
@@ -85,6 +86,16 @@ contract CounterV1 {
 
     function getVersion() external pure returns (string memory) {
         return "V1";
+    }
+
+    /// @notice Withdraw ETH received via receive/fallback. Owner only.
+    function withdraw() external {
+        require(msg.sender == owner, "only owner");
+        uint256 bal = address(this).balance;
+        if (bal > 0) {
+            (bool ok,) = payable(msg.sender).call{value: bal}("");
+            require(ok, "transfer failed");
+        }
     }
 
     // 允许接收 ETH
@@ -134,6 +145,7 @@ contract CounterV2 {
 
     function initialize(address _owner) external {
         // Check if already initialized by checking if lastUpdated was set
+        // slither-disable-next-line incorrect-equality -- proxy init: lastUpdated 0 means uninitialized
         require(lastUpdated == 0, "already initialized");
         require(_owner != address(0), "invalid owner");
         owner = _owner;

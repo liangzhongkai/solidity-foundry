@@ -32,6 +32,7 @@ contract PatternVaultEchidna {
 
     function queueSelf(uint96 rawAmount) external {
         uint256 surplus = address(vault).balance - vault.totalCredits();
+        // slither-disable-next-line incorrect-equality -- early-exit guard: no surplus to queue
         if (surplus == 0) return;
 
         uint256 amount = rawAmount;

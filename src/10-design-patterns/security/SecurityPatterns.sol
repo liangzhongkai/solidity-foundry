@@ -203,6 +203,7 @@ contract SecurityPatterns {
         uint256 available = _surplus();
         if (amount > available) revert InsufficientSurplus(amount, available);
 
+        // slither-disable-next-line incorrect-equality -- intentional: full sweep triggers termination
         if (amount == available) {
             if (totalLiabilities != 0) revert OutstandingLiabilities(totalLiabilities);
             isTerminated = true;

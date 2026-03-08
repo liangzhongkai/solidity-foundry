@@ -80,6 +80,7 @@ contract TokenVesting {
         if (totalAmount == 0 || timestamp < startTime) return 0;
 
         // Discrete vesting: unlock 1/n per day (integer days elapsed)
+        // slither-disable-next-line divide-before-multiply -- intentional: discrete per-day unlock
         uint256 elapsedDays = (timestamp - startTime) / 1 days;
         if (elapsedDays >= vestingDays) return totalAmount;
         return (totalAmount * elapsedDays) / vestingDays;

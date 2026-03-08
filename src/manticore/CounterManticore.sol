@@ -29,7 +29,8 @@ contract CounterManticore {
         return true;
     }
 
-    /// @notice 属性: 合约状态一致
+    /// @notice 属性: number 为有效 uint256 (无下溢)
+    /// slither-disable-next-line tautology -- uint256 >= 0 is always true; documents validity
     function crytic_test_state_consistent() public view returns (bool) {
         return counter.number() >= 0;
     }

@@ -303,6 +303,7 @@ contract ProductionERC20 {
         if (oldVotes == newVotes) return;
         Checkpoint[] storage ckpts = _delegateCheckpoints[delegatee];
         uint32 blockNumber = uint32(block.number);
+        // slither-disable-next-line incorrect-equality -- intentional: update in-place when same block
         if (blockNumber != 0 && ckpts.length > 0 && ckpts[ckpts.length - 1].fromBlock == blockNumber) {
             // forge-lint: disable-next-line(unsafe-typecast) -- votes fit in uint224 (supply << 2^224)
             ckpts[ckpts.length - 1].votes = uint224(newVotes);

@@ -111,7 +111,12 @@ contract ReceiveFallbackDemo {
  */
 contract OnlyReceive {
     uint256 public totalReceived;
+    address public immutable owner;
     event Received(address indexed sender, uint256 amount);
+
+    constructor() {
+        owner = msg.sender;
+    }
 
     receive() external payable {
         totalReceived += msg.value;
@@ -120,6 +125,15 @@ contract OnlyReceive {
 
     function getBalance() external view returns (uint256) {
         return address(this).balance;
+    }
+
+    function withdraw() external {
+        require(msg.sender == owner, "only owner");
+        uint256 bal = address(this).balance;
+        if (bal > 0) {
+            (bool ok,) = payable(owner).call{value: bal}("");
+            require(ok, "transfer failed");
+        }
     }
 }
 
@@ -132,7 +146,12 @@ contract OnlyReceive {
 contract OnlyFallback {
     uint256 public totalReceived;
     bytes public lastData;
+    address public immutable owner;
     event FallbackCalled(address indexed sender, uint256 value, bytes data);
+
+    constructor() {
+        owner = msg.sender;
+    }
 
     // 空的 receive() 函数用于消除编译警告
     // 实际使用中不会被调用（测试会调用带 data 的函数触发 fallback）
@@ -151,6 +170,15 @@ contract OnlyFallback {
     function getBalance() external view returns (uint256) {
         return address(this).balance;
     }
+
+    function withdraw() external {
+        require(msg.sender == owner, "only owner");
+        uint256 bal = address(this).balance;
+        if (bal > 0) {
+            (bool ok,) = payable(owner).call{value: bal}("");
+            require(ok, "transfer failed");
+        }
+    }
 }
 
 /**
@@ -161,6 +189,11 @@ contract OnlyFallback {
  */
 contract NeitherReceiveNorFallback {
     uint256 public publicValue;
+    address public immutable owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
 
     // 可支付的函数
     function deposit() external payable {
@@ -169,6 +202,15 @@ contract NeitherReceiveNorFallback {
 
     function getBalance() external view returns (uint256) {
         return address(this).balance;
+    }
+
+    function withdraw() external {
+        require(msg.sender == owner, "only owner");
+        uint256 bal = address(this).balance;
+        if (bal > 0) {
+            (bool ok,) = payable(owner).call{value: bal}("");
+            require(ok, "transfer failed");
+        }
     }
 }
 

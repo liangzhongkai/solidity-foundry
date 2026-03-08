@@ -31,6 +31,7 @@ contract SecurityPatternsEchidna {
 
     function queueSelf(uint96 rawAmount) external {
         uint256 surplus = address(sec).balance - sec.totalLiabilities();
+        // slither-disable-next-line incorrect-equality -- early-exit guard: no surplus
         if (surplus == 0) return;
 
         uint256 amount = rawAmount;
@@ -54,6 +55,7 @@ contract SecurityPatternsEchidna {
 
     function terminate(uint96 rawAmount) external {
         uint256 surplus = address(sec).balance - sec.totalLiabilities();
+        // slither-disable-next-line incorrect-equality -- early-exit guard: no surplus
         if (surplus == 0) return;
 
         uint256 amount = rawAmount;
@@ -68,6 +70,7 @@ contract SecurityPatternsEchidna {
     }
 
     function echidna_terminated_has_no_liabilities() external view returns (bool) {
+        // slither-disable-next-line incorrect-equality -- invariant: terminated implies zero liabilities
         return !sec.isTerminated() || sec.totalLiabilities() == 0;
     }
 

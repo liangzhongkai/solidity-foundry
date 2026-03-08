@@ -89,6 +89,7 @@ contract SimpleLottery is ReentrancyGuard {
         if (lottery.winner == address(0)) {
             bytes32 h = blockhash(lottery.drawBlock);
             if (h == bytes32(0)) revert ClaimWindowClosed(); // block too old
+            // slither-disable-next-line weak-prng -- blockhash-based RNG; documented as low-stakes only; use Chainlink VRF for production
             uint256 winnerIndex = uint256(keccak256(abi.encodePacked(h))) % lottery.ticketCount;
             lottery.winner = lottery.participants[winnerIndex];
         }

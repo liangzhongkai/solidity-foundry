@@ -138,6 +138,15 @@ contract V1Legacy {
         balances[msg.sender] += msg.value;
     }
 
+    function withdraw() external {
+        require(msg.sender == owner, "Unauthorized");
+        uint256 bal = address(this).balance;
+        if (bal > 0) {
+            (bool ok,) = payable(owner).call{value: bal}("");
+            require(ok, "transfer failed");
+        }
+    }
+
     function setMigrationTarget(address target) external {
         if (msg.sender != owner) revert Unauthorized();
         if (target == address(0)) revert ZeroAddress();
