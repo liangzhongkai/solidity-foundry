@@ -10,10 +10,11 @@ Project-centric state for architecture, design, and implementation. Load at star
 ## Module Boundaries
 
 - SimpleLottery: standalone; no cross-module calls. Uses OpenZeppelin ReentrancyGuard.
+- ERC1155Bingo: standalone; extends OpenZeppelin ERC1155; no cross-module calls.
 
 ## Design Tradeoffs
 
-- blockhash randomness: simple, no oracle; miner-influenceable. Suitable for low-stakes only.
+- blockhash randomness: simple, no oracle; miner-influenceable. Suitable for low-stakes only (SimpleLottery, ERC1155Bingo).
 - participants as address[]: O(n) refund scan; acceptable for demo scale.
 
 ## Code Style Expectations
@@ -33,7 +34,8 @@ Project-centric state for architecture, design, and implementation. Load at star
 ## Performance Constraints
 
 - Refund iterates participants; O(n) per participant. Not suitable for large lotteries.
+- ERC1155Bingo draw iterates all players; O(players) per draw.
 
 ## Last Updated
 
-- Issue #9, 2026-03-08
+- Issue #10, 2026-03-08
