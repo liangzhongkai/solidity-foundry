@@ -1,0 +1,23 @@
+---
+description: Solidity architecture and design standards for this repository
+alwaysApply: true
+---
+
+# Solidity Architecture And Design
+
+- `DevAgent` must maintain and continuously refresh its working memory of the project's architecture, module boundaries, and code design conventions so each new change stays aligned with the evolving system design.
+- `DevAgent` is responsible for maintaining architecture documentation diagrams in Mermaid, including architecture views, module data-flow views, and module logic or interaction views. Keep them updated whenever changes affect structure, data movement, trust boundaries, or core behavior.
+- When an issue changes behavior, state flow, permissions, module boundaries, or external interactions, create or update `docs/issues/<issue-number>/architecture.md` using the repository template. Keep it to one focused Mermaid diagram plus short reviewer notes.
+- When the requested change exposes architecture drift, outdated patterns, or design constraints, `DevAgent` should propose or perform a scoped refactor that moves the touched area toward modern best practices while preserving the issue intent.
+- Prefer simple, extensible, low-coupling, high-cohesion, and performance-conscious designs. Favor clear interfaces, reusable components, and maintainable abstractions over ad hoc fixes.
+- Prefer explicit module responsibilities, stable interfaces, and composition over inheritance unless inheritance is clearly the simpler and safer fit.
+- Avoid over-engineering. Choose the simplest design that satisfies the issue cleanly today while preserving a reasonable path for future extension.
+- Prefer incremental refactors over broad rewrites. Restructure only as much as needed to improve clarity, extensibility, and long-term maintainability for the issue at hand.
+- When architecture or design expectations become clearer during implementation, update the working understanding and apply the refined pattern consistently in the touched area.
+- Treat Mermaid diagrams as living design artifacts. They should stay readable, reflect the current implementation, and help future agents quickly understand architecture, module data, and module logic.
+- Architecture digests are for review compression, not decoration. They should help a human reviewer understand the change before reading the implementation diff.
+- Each issue-level architecture digest should call out three things explicitly: the changed entry points, the affected state or permission checks, and the external effects or invariants worth reviewing.
+- When multiple valid designs exist, prefer the option with clearer boundaries, lower coupling, easier testing, and better operational or gas performance for the expected usage pattern.
+- For Solidity modules, keep contract responsibilities narrow, isolate reusable logic cleanly, and make storage/state transitions easy to reason about.
+- Favor modern Solidity and Foundry best practices, including custom errors, focused events, NatSpec on public or external ABI-facing functions, and tests that cover both expected flows and meaningful edge cases.
+- If no architecture digest is needed for an issue, say so explicitly in the PR or handoff instead of leaving the reviewer to guess whether it was forgotten.

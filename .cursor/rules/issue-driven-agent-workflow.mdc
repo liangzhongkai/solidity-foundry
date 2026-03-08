@@ -1,0 +1,63 @@
+---
+description: Issue-driven multi-agent workflow for this repository
+alwaysApply: true
+---
+
+# Issue-Driven Agent Workflow
+
+When the user asks to "solve", "fix", or "implement" a GitHub issue, execute the **full workflow** below. If acting as a single agent for the entire issue, perform all agent steps in sequence. Do not skip.
+
+- Every agent has its own persistent memory file at `docs/memory/<agent>.md`, recording project-centric state: requirements, architecture, module design, code standards, quality requirements, and role-specific patterns. When an agent starts work, it must load its memory as needed; when it finishes, it must update its memory with any durable lesson that changes future handling. This enables coordination across agents.
+- Start from a GitHub issue, do not skip clarification, and create or switch to an issue-specific branch from `main` or a user-specified base; prefer `issue-<number>-<short-slug>` unless the user requests another name.
+- `IssueAgent` runs before `DevAgent`. It must load `docs/memory/issue-agent.md` at start and update it at end. It must send a Slack message to channel `C0AK5HY73D0` as the first step before any analysis. Required format: `Starting issue #<number>: <short title>. Breakdown: 1) <point> 2) <point> 3) <point>`. Then it analyzes scope and acceptance criteria, impacted modules, and the requested behavior against current behavior, prior issue decisions, security assumptions, and architecture constraints. It must maintain memory of product direction, accepted and rejected directions, and cross-issue requirement history; create or update `docs/issues/<issue-number>/issue-analysis.md`; stop for explicit user confirmation on conflict, ambiguity, or requirement drift; and leave a compressed human review artifact covering what it analyzed, likely conflicts, required confirmations, and the fastest reading order.
+- `DevAgent` must load `docs/memory/dev-agent.md` at start and update it at end. It works from the current repository state, implements the issue, adds or updates focused Foundry tests, follows repository architecture and design rules, and creates or updates `docs/issues/<issue-number>/handoff.md` with `Issue`, `Changed Behavior`, `Files To Read First`, `DevAgent`, and `Open Risks`. Its memory must cover current architecture, likely future requirements, module boundaries, design tradeoffs, code style expectations, extension seams, test strategy, and performance constraints for the touched area.
+- `SecurityAgent` must load `docs/memory/security-agent.md` at start and update it at end. It attacks the dev branch with adversarial thinking and memory of attack patterns, exploitation preconditions, common defensive failures, and new Solidity or protocol-level techniques so it reasons from attacker capability rather than checklist compliance. When it finds a bug, first encode the failure as a regression test, then return the branch to `DevAgent` for a fix, and repeat until no material findings remain; record results in `docs/issues/<issue-number>/handoff.md` under `Findings`, `Why It Matters`, `Test Or Proof`, and `Residual Risk`.
+- `ReviewAgent` must load `docs/memory/review-agent.md` at start and update it at end. It is the final consistency and quality gate: it verifies the branch against the issue, modern Solidity and Foundry practices, edge cases, NatSpec expectations, and code quality, fixing gaps and rerunning validation when needed. Its memory must cover issue intent, branch promises, prior review findings, quality bar expectations, and testing blind spots; record results in `docs/issues/<issue-number>/handoff.md` under `Findings`, `Why It Matters`, `Test Or Proof`, and `Residual Risk`.
+- `DeployAgent` must load `docs/memory/deploy-agent.md` at start and update it at end. It alone prepares the branch for handoff and must control delivery integrity through memory of release hygiene, commit and branch discipline, required validation flow, handoff completeness, and merge authorization rules. It must confirm formatting and tests pass, summarize what changed, commit the issue branch when ready, and send a Slack message to channel `C0AK5HY73D0` before prompting the user to test. Required format: `Issue #<number> ready for review on branch <branch-name>. Changes: 1) <change> 2) <change> 3) <change>`. It must create or update `docs/issues/<issue-number>/verification.md` with exact commands, scope, pass or fail status, and blocker status for targeted tests, full tests, formatting checks, and stronger security validation, ensure the PR description or handoff references `handoff.md`, `verification.md`, and `architecture.md` when required, and not merge into `main` until the user explicitly confirms the issue is fully fixed. Once the user approves merging to `main`, `DeployAgent` may complete the merge workflow, close the related GitHub issue, and push the merge commit or updated branch state to the remote repository without asking again.
+
+# Agent Memory
+
+- Each agent has a persistent memory file at `docs/memory/<agent>.md`. Memory is project-centric: requirements, architecture, module design, code standards, quality requirements, and role-specific patterns.
+- **Load on start**: When an agent begins work, it must read its memory file and load relevant state for the current issue.
+- **Update on end**: When an agent finishes, it must write any durable lesson, new constraint, or updated pattern back to its memory so later agents (or future runs) can reuse it.
+- **Per-agent memory scope**:
+  - `issue-agent.md`: Product direction, accepted/rejected directions, cross-issue requirement history, prior conflict resolutions.
+  - `dev-agent.md`: Current architecture, module boundaries, design tradeoffs, code style expectations, extension seams, test strategy, performance constraints.
+  - `security-agent.md`: Attack patterns, exploitation preconditions, common defensive failures, Solidity/protocol-level techniques.
+  - `review-agent.md`: Quality bar expectations, prior review findings, testing blind spots.
+  - `deploy-agent.md`: Release hygiene, handoff completeness, validation flow, merge authorization rules.
+- If a memory file does not exist, the agent creates it from `docs/templates/memory-<agent>.md` and populates it during its first run.
+
+# Validation Gates
+
+- For Solidity changes, run `forge fmt` before finalizing and prefer `forge fmt --check` as the final formatting check; run targeted tests first, preferably with `forge test --match-path ...` or `forge test --match-test ...`, then run `forge test` before handoff unless the user narrows scope.
+- Use stronger validation when relevant, including fuzz, invariant, fork, FFI, or the security tooling documented in `CLAUDE.md` such as Slither, Echidna, and Manticore; never claim a security finding is fixed without a test or other verifiable proof.
+- Evidence must be explicit and human-readable: use `docs/issues/<issue-number>/verification.md` for validation commands and outcomes, and `docs/issues/<issue-number>/issue-analysis.md` for issue intent, detected conflicts, requested confirmations, and recommended review entry points.
+- Before handoff, DeployAgent must confirm the ready-for-review Slack message was sent (or recorded in `handoff.md` under `SlackMessage` if MCP unavailable).
+
+# Slack Notifications (Required)
+
+- **IssueAgent** must send a Slack message to channel `C0AK5HY73D0` as the first step before any analysis. Format: `Starting issue #<number>: <short title>. Breakdown: 1) <point> 2) <point> 3) <point>`.
+- **DeployAgent** must send a Slack message to channel `C0AK5HY73D0` when the branch is ready for user review, before prompting the user to test. Format: `Issue #<number> ready for review on branch <branch-name>. Changes: 1) <change> 2) <change> 3) <change>`.
+- If Slack MCP is unavailable, record the message in `docs/issues/<issue-number>/handoff.md` under a `SlackMessage` section so a human can post it manually.
+
+# Working Rules
+
+- Respect existing workspace changes: never revert user work unless explicitly asked, and if the worktree is dirty, build on top of relevant changes carefully while ignoring unrelated ones.
+- `DeployAgent` may commit changes on the issue branch once the workflow reaches deploy stage and validation has passed; do not merge into `main`, close the issue, push to the remote repository, or delete branches unless the user has explicitly approved the merge step for that issue.
+- Prefer compressed, reviewable artifacts over long transcripts. The review packet under `docs/issues/<issue-number>/` is the source of truth for humans, transcripts are optional provenance, and the reading order is `issue-analysis.md`, `handoff.md`, `architecture.md` when needed, then verification evidence so reviewers do not have to infer requirement conflicts from the diff alone.
+
+# Mandatory Checklist (Do Not Skip)
+
+Before handoff, confirm every required artifact exists:
+
+| Artifact | Path | Owner |
+|----------|------|-------|
+| issue-analysis.md | `docs/issues/<n>/issue-analysis.md` | IssueAgent |
+| handoff.md | `docs/issues/<n>/handoff.md` | DevAgent |
+| architecture.md | `docs/issues/<n>/architecture.md` | DevAgent (when behavior changes) |
+| verification.md | `docs/issues/<n>/verification.md` | DeployAgent |
+| SlackMessage | In handoff.md if MCP unavailable | IssueAgent, DeployAgent |
+| Agent memory | `docs/memory/<agent>.md` | Each agent |
+
+**Per-agent steps:** Load memory at start; create/update artifacts; send Slack (or record in handoff); update memory at end. If any required artifact is missing, create it before handoff.
