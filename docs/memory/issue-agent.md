@@ -10,6 +10,7 @@ Project-centric state for requirement analysis and conflict resolution. Load at 
 
 - Simple lottery (#9): blockhash for randomness (RareSkills pattern); 24h purchase + 1h delay; 256-block claim window; refund if no claim.
 - ERC1155 Bingo (#10): ERC1155 tokens 1-25, 5x5 grid per player, draw every n blocks, first 5-in-row wins.
+- On-chain Blackjack (#11): Open hands, blockhash RNG (2-9: 1/13, 10: 4/13, Ace: 1/13), dealer hits until 17, 10-block move timeout.
 
 ## Rejected Directions
 
@@ -19,6 +20,7 @@ Project-centric state for requirement analysis and conflict resolution. Load at 
 
 - Issue #9: standalone SimpleLottery; no dependencies on other modules.
 - Issue #10: standalone ERC1155Bingo; blockhash for randomness.
+- Issue #11: standalone OnChainBlackjack; dealer threshold 17 (standard); issue text said "at least 21" but 17 used for playability.
 
 ## Prior Conflict Resolutions
 
@@ -26,4 +28,4 @@ Project-centric state for requirement analysis and conflict resolution. Load at 
 
 ## Last Updated
 
-- Issue #10, 2026-03-08
+- Issue #11, 2026-03-08

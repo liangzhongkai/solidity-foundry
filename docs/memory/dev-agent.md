@@ -11,6 +11,7 @@ Project-centric state for architecture, design, and implementation. Load at star
 
 - SimpleLottery: standalone; no cross-module calls. Uses OpenZeppelin ReentrancyGuard.
 - ERC1155Bingo: standalone; extends OpenZeppelin ERC1155; no cross-module calls.
+- OnChainBlackjack: standalone; no cross-module calls; no ETH/token transfers.
 
 ## Design Tradeoffs
 
@@ -38,4 +39,4 @@ Project-centric state for architecture, design, and implementation. Load at star
 
 ## Last Updated
 
-- Issue #10, 2026-03-08
+- Issue #11, 2026-03-08

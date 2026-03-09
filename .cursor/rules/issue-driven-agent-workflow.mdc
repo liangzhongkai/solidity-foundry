@@ -61,3 +61,5 @@ Before handoff, confirm every required artifact exists:
 | Agent memory | `docs/memory/<agent>.md` | Each agent |
 
 **Per-agent steps:** Load memory at start; create/update artifacts; send Slack (or record in handoff); update memory at end. If any required artifact is missing, create it before handoff.
+
+**Commit rule:** When DeployAgent commits the issue branch, include `docs/memory/*.md` updates in the same commit; do not leave agent memory changes unstaged.

@@ -30,8 +30,8 @@ contract CounterManticore {
     }
 
     /// @notice 属性: number 为有效 uint256 (无下溢)
-    /// slither-disable-next-line tautology -- uint256 >= 0 is always true; documents validity
     function crytic_test_state_consistent() public view returns (bool) {
+        // slither-disable-next-line tautology -- uint256 >= 0 is always true; documents validity
         return counter.number() >= 0;
     }
 }

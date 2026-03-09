@@ -30,8 +30,8 @@ contract CounterEchidna {
     }
 
     /// @notice 不变式: number 始终为有效 uint256 (无下溢)
-    /// slither-disable-next-line tautology -- uint256 >= 0 is always true; invariant documents validity
     function echidna_setNumber_preserved() public view returns (bool) {
+        // slither-disable-next-line tautology -- uint256 >= 0 is always true; invariant documents validity
         return counter.number() >= 0;
     }
 }

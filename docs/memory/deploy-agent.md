@@ -10,6 +10,7 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 ## Handoff Completeness
 
 - handoff.md: Issue, Changed Behavior, Files To Read First, DevAgent, Open Risks, SlackMessage (if MCP unavailable).
+- **Agent memory**: Commit `docs/memory/*.md` updates together with the issue implementation; do not leave them unstaged.
 - When Slack MCP unavailable: record in handoff AND explicitly tell user to post—do not silently record.
 - verification.md: commands, pass/fail, blocker status.
 - architecture.md: when issue changes behavior/state flow.
@@ -29,4 +30,4 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 
 ## Last Updated
 
-- Issue #9, 2026-03-08
+- Issue #11, 2026-03-08

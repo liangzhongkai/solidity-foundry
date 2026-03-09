@@ -133,6 +133,7 @@ contract ERC1155Bingo is ERC1155 {
     }
 
     function _generateGrid(uint256 gameId) internal returns (uint8[25] memory) {
+        // slither-disable-next-line uninitialized-local -- fixed-size memory array is zero-initialized in Solidity
         uint8[25] memory arr;
         for (uint256 i = 0; i < 25; i++) {
             arr[i] = uint8(i + 1);
@@ -160,8 +161,9 @@ contract ERC1155Bingo is ERC1155 {
     }
 
     function _pickUndrawnNumber(uint256 drawnBitmap) internal view returns (uint8) {
+        // slither-disable-next-line uninitialized-local -- fixed-size memory array is zero-initialized in Solidity
         uint8[25] memory undrawn;
-        uint256 count;
+        uint256 count = 0;
         for (uint8 i = 1; i <= 25; i++) {
             if ((drawnBitmap & (uint256(1) << (i - 1))) == 0) {
                 undrawn[count++] = i;
@@ -170,6 +172,7 @@ contract ERC1155Bingo is ERC1155 {
         if (count == 0) revert AllNumbersDrawn();
         bytes32 h = blockhash(block.number > 0 ? block.number - 1 : block.number);
         uint256 r = uint256(keccak256(abi.encodePacked(h, block.timestamp)));
+        // slither-disable-next-line weak-prng -- blockhash-based RNG; documented as demo only; use Chainlink VRF for production
         return undrawn[r % count];
     }
 
