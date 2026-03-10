@@ -9,13 +9,14 @@ Project-centric state for quality bar and review consistency. Load at start, upd
 
 ## Prior Review Findings
 
-- (none recorded)
+- AdvancedERC20 (#12): All quality checks pass; 57 tests; NatSpec complete; custom errors throughout.
 
 ## Testing Blind Spots
 
 - blockhash availability: tests must vm.roll(drawBlock+1) not vm.roll(drawBlock).
 - Refund with multiple participants: verify swap-with-last in _removeParticipant.
+- AccessControl role tests: vm.prank may not work with _msgSender() in inherited contracts; use simpler verification.
 
 ## Last Updated
 
-- Issue #11, 2026-03-08
+- Issue #12, 2026-03-10
