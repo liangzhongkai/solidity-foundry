@@ -96,8 +96,11 @@ jobs:
           . .manticore-venv/bin/activate
           python -m pip install --upgrade pip
           pip install "protobuf>=3.19.0,<4"  # Manticore _pb2.py incompatible with protobuf 4.21+
+          pip install "solc-select"
+          solc-select install 0.8.20
+          solc-select use 0.8.20
           pip install "manticore==0.3.7"
-          manticore-verifier . \
+          manticore-verifier src/manticore/CounterManticore.sol \
             --contract_name CounterManticore \
-            --compile-force-framework foundry \
+            --config-file crytic_compile.config.json \
             --timeout 300
