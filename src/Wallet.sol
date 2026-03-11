@@ -11,6 +11,7 @@ contract Wallet {
     event Withdrawal(address indexed to, uint256 amount);
 
     constructor() payable {
+        require(msg.sender != address(0), "deployer cannot be zero");
         owner = payable(msg.sender);
     }
 

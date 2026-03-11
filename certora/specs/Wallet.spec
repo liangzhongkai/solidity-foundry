@@ -9,7 +9,8 @@ rule withdrawOnlyOwner(env e, uint256 amount) {
 
     withdraw@withrevert(e, amount);
 
-    assert !lastReverted <=> e.msg.sender == current, "withdraw access control failed";
+    // Only owner can succeed; non-owner always reverts. Owner may still revert if transfer fails.
+    assert !lastReverted => e.msg.sender == current, "withdraw access control failed";
     assert owner() == oldOwner, "withdraw must not change owner";
 }
 
@@ -54,4 +55,9 @@ rule ownerChangesOnlyViaAuthorizedSetOwner(env e) {
 }
 
 invariant ownerIsNeverZero()
-    owner() != 0;
+    owner() != 0
+    {
+        preserved constructor() with (env e) {
+            require e.msg.sender != 0;
+        }
+    }
