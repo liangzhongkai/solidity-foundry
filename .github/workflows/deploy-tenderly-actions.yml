@@ -1,0 +1,74 @@
+name: Deploy Tenderly Actions
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_path:
+        description: Path to the Tenderly config file
+        required: true
+        default: tenderly.yaml
+
+jobs:
+  deploy:
+    name: Deploy Web3 Actions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      TENDERLY_ACCESS_KEY: ${{ secrets.TENDERLY_ACCESS_KEY }}
+      TENDERLY_ACCOUNT_SLUG: ${{ vars.TENDERLY_ACCOUNT_SLUG }}
+      TENDERLY_PROJECT_SLUG: ${{ vars.TENDERLY_PROJECT_SLUG }}
+      CONFIG_PATH: ${{ github.event.inputs.config_path }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Validate required settings
+        run: |
+          test -n "$TENDERLY_ACCESS_KEY" || { echo "Missing secret: TENDERLY_ACCESS_KEY"; exit 1; }
+          test -n "$TENDERLY_ACCOUNT_SLUG" || { echo "Missing variable: TENDERLY_ACCOUNT_SLUG"; exit 1; }
+          test -n "$TENDERLY_PROJECT_SLUG" || { echo "Missing variable: TENDERLY_PROJECT_SLUG"; exit 1; }
+          test -f "$CONFIG_PATH" || { echo "Missing config file: $CONFIG_PATH"; exit 1; }
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Render Tenderly config
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          src = Path(os.environ["CONFIG_PATH"])
+          content = src.read_text()
+          content = content.replace("${TENDERLY_ACCOUNT_SLUG}", os.environ["TENDERLY_ACCOUNT_SLUG"])
+          content = content.replace("${TENDERLY_PROJECT_SLUG}", os.environ["TENDERLY_PROJECT_SLUG"])
+          Path("tenderly.yaml").write_text(content)
+          PY
+
+      - name: Install Tenderly CLI
+        run: npm install -g @tenderly/cli
+
+      - name: Authenticate Tenderly CLI
+        run: tenderly login --access-key "$TENDERLY_ACCESS_KEY" --authentication-method access-key
+
+      - name: Deploy Web3 Actions
+        run: tenderly actions deploy
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Tenderly deployment"
+            echo
+            echo "- Config path: \`$CONFIG_PATH\`"
+            echo "- Account slug: \`$TENDERLY_ACCOUNT_SLUG\`"
+            echo "- Project slug: \`$TENDERLY_PROJECT_SLUG\`"
+            echo "- Note: \`tenderly actions deploy\` expects a ready \`tenderly.yaml\` with real alert IDs."
+          } >> "$GITHUB_STEP_SUMMARY"

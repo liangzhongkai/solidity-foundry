@@ -43,7 +43,16 @@ jobs:
         run: forge build --sizes --build-info
 
       - name: Run Forge tests
-        run: forge test -vvv --ffi
+        run: |
+          set -o pipefail
+          forge test -vvv --ffi --gas-report | tee gas-report.txt
+
+      - name: Upload gas report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gas-report
+          path: gas-report.txt
+          if-no-files-found: error
 
       - name: Slither (静态分析)
         run: slither . --config-file slither.config.json --fail-high

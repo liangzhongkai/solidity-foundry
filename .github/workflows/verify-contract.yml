@@ -1,0 +1,90 @@
+name: Verify Existing Deployment
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+    inputs:
+      contract_address:
+        description: Deployed contract address
+        required: true
+      contract_id:
+        description: Contract identifier, for example src/Counter.sol:Counter
+        required: true
+      chain_id:
+        description: Chain ID used for verification
+        required: true
+        default: "11155111"
+      compiler_version:
+        description: Solidity compiler version used for the deployment
+        required: true
+        default: "v0.8.20+commit.a1b79de6"
+      num_of_optimizations:
+        description: Optimizer runs used during compilation
+        required: true
+        default: "200"
+      constructor_args:
+        description: Optional ABI-encoded constructor arguments
+        required: false
+        default: ""
+
+jobs:
+  verify:
+    name: Verify on explorer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+      CONTRACT_ADDRESS: ${{ github.event.inputs.contract_address }}
+      CONTRACT_ID: ${{ github.event.inputs.contract_id }}
+      CHAIN_ID: ${{ github.event.inputs.chain_id }}
+      COMPILER_VERSION: ${{ github.event.inputs.compiler_version }}
+      NUM_OF_OPTIMIZATIONS: ${{ github.event.inputs.num_of_optimizations }}
+      CONSTRUCTOR_ARGS: ${{ github.event.inputs.constructor_args }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Validate required secrets
+        run: test -n "$ETHERSCAN_API_KEY" || { echo "Missing secret: ETHERSCAN_API_KEY"; exit 1; }
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run explorer verification
+        run: |
+          ARGS=(
+            --chain-id "$CHAIN_ID"
+            --num-of-optimizations "$NUM_OF_OPTIMIZATIONS"
+            --watch
+            --etherscan-api-key "$ETHERSCAN_API_KEY"
+            --compiler-version "$COMPILER_VERSION"
+          )
+
+          if [ -n "$CONSTRUCTOR_ARGS" ]; then
+            ARGS+=(--constructor-args "$CONSTRUCTOR_ARGS")
+          fi
+
+          forge verify-contract "${ARGS[@]}" "$CONTRACT_ADDRESS" "$CONTRACT_ID" | tee verify-output.txt
+
+      - name: Upload verification output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-output
+          path: verify-output.txt
+          if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Explorer verification"
+            echo
+            echo "- Contract: \`$CONTRACT_ID\`"
+            echo "- Address: \`$CONTRACT_ADDRESS\`"
+            echo "- Chain ID: \`$CHAIN_ID\`"
+          } >> "$GITHUB_STEP_SUMMARY"

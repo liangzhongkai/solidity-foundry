@@ -1,0 +1,88 @@
+name: Deploy To Sepolia
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+    inputs:
+      script_target:
+        description: Foundry script target to deploy
+        required: true
+        default: script/Counter.s.sol:CounterScript
+      verify_on_explorer:
+        description: Verify the deployed contract on the explorer
+        required: true
+        type: boolean
+        default: true
+
+env:
+  FOUNDRY_PROFILE: ci
+
+concurrency:
+  group: deploy-sepolia-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy and verify on Sepolia
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+      PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
+      DEV_PRIVATE_KEY: ${{ secrets.SEPOLIA_PRIVATE_KEY }}
+      ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+      SCRIPT_TARGET: ${{ github.event.inputs.script_target || 'script/Counter.s.sol:CounterScript' }}
+      VERIFY_ON_EXPLORER: ${{ github.event.inputs.verify_on_explorer || 'true' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Validate required secrets
+        run: |
+          test -n "$SEPOLIA_RPC_URL" || { echo "Missing secret: SEPOLIA_RPC_URL"; exit 1; }
+          test -n "$PRIVATE_KEY" || { echo "Missing secret: SEPOLIA_PRIVATE_KEY"; exit 1; }
+          if [ "$VERIFY_ON_EXPLORER" = "true" ]; then
+            test -n "$ETHERSCAN_API_KEY" || { echo "Missing secret: ETHERSCAN_API_KEY"; exit 1; }
+          fi
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Show Forge version
+        run: forge --version
+
+      - name: Build contracts
+        run: forge build --sizes
+
+      - name: Deploy script
+        run: |
+          ARGS=(--rpc-url "$SEPOLIA_RPC_URL" --private-key "$PRIVATE_KEY" --broadcast -vvvv)
+          if [ "$VERIFY_ON_EXPLORER" = "true" ]; then
+            ARGS+=(--verify)
+          fi
+
+          forge script "$SCRIPT_TARGET" "${ARGS[@]}"
+
+      - name: Upload broadcast artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sepolia-broadcast
+          path: |
+            broadcast/**/run-latest.json
+          if-no-files-found: warn
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Sepolia deployment"
+            echo
+            echo "- Script target: \`$SCRIPT_TARGET\`"
+            echo "- Explorer verification: \`$VERIFY_ON_EXPLORER\`"
+            echo "- Broadcast artifacts: uploaded when produced by Foundry"
+          } >> "$GITHUB_STEP_SUMMARY"

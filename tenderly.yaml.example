@@ -1,0 +1,32 @@
+account_id: "${TENDERLY_ACCOUNT_SLUG}"
+project_slug: "${TENDERLY_PROJECT_SLUG}"
+
+actions:
+  ${TENDERLY_ACCOUNT_SLUG}/${TENDERLY_PROJECT_SLUG}:
+    runtime: v2
+    sources: tenderly/actions
+    specs:
+      wallet-large-balance-change:
+        description: "Notify when Wallet sees a meaningful native balance change"
+        function: notify:largeBalanceChange
+        trigger:
+          type: alert
+          alert:
+            <WALLET_LARGE_BALANCE_CHANGE_ALERT_ID>
+        execution_type: parallel
+      wallet-privileged-call:
+        description: "Notify when Wallet owner-only functions are called"
+        function: notify:privilegedCall
+        trigger:
+          type: alert
+          alert:
+            <WALLET_PRIVILEGED_CALL_ALERT_ID>
+        execution_type: parallel
+      wallet-failed-transaction:
+        description: "Notify when transactions against Wallet fail"
+        function: notify:failedTransaction
+        trigger:
+          type: alert
+          alert:
+            <WALLET_FAILED_TX_ALERT_ID>
+        execution_type: parallel

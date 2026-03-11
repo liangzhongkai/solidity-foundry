@@ -1,0 +1,64 @@
+name: Formal Verification
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+    inputs:
+      certora_command:
+        description: Full certoraRun command arguments, excluding the certoraRun executable itself
+        required: true
+      solc_version:
+        description: solc version required by the proof configuration
+        required: true
+        default: "0.8.20"
+
+jobs:
+  certora:
+    name: Run Certora Prover
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CERTORAKEY: ${{ secrets.CERTORAKEY }}
+      CERTORA_COMMAND: ${{ github.event.inputs.certora_command }}
+      SOLC_VERSION: ${{ github.event.inputs.solc_version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Validate required secrets
+        run: test -n "$CERTORAKEY" || { echo "Missing secret: CERTORAKEY"; exit 1; }
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install Certora CLI and solc
+        run: |
+          pip install certora-cli solc-select
+          solc-select install "$SOLC_VERSION"
+          solc-select use "$SOLC_VERSION"
+
+      - name: Run Certora prover
+        run: certoraRun $CERTORA_COMMAND
+
+      - name: Write job summary
+        if: always()
+        run: |
+          {
+            echo "## Formal verification"
+            echo
+            echo "- Command: \`certoraRun $CERTORA_COMMAND\`"
+            echo "- solc version: \`$SOLC_VERSION\`"
+            echo "- Note: this workflow is a manual entrypoint and requires repository-owned Certora specs/configs."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -13,6 +13,11 @@ Foundry consists of:
 
 https://book.getfoundry.sh/
 
+Repository CI/CD notes:
+
+- `docs/blockchain-cicd.md`
+- `docs/tenderly-setup.md`
+
 ## Usage
 
 ### Build
