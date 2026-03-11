@@ -30,7 +30,8 @@ jobs:
           submodules: recursive
 
       - name: Validate required secrets
-        run: test -n "$CERTORAKEY" || { echo "Missing secret: CERTORAKEY"; exit 1; }
+        run: |
+          test -n "$CERTORAKEY" || { echo "Missing secret: CERTORAKEY"; exit 1; }
 
       - name: Set up Python
         uses: actions/setup-python@v5

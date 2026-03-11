@@ -31,10 +31,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.11"
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install "slither-analyzer>=0.10.0,<0.11.0"
 
       - name: Run Forge fmt
         run: forge fmt --check
@@ -69,6 +72,10 @@ jobs:
 
       - name: Manticore (符号执行)
         run: |
+          python -m venv .manticore-venv
+          . .manticore-venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install "manticore==0.3.7"
           manticore-verifier src/manticore/CounterManticore.sol \
             --contract_name CounterManticore \
             --timeout 300
