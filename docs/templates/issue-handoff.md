@@ -30,6 +30,12 @@ Use this file as `docs/issues/<issue-number>/handoff.md`.
 
 - `<design rationale>`
 
+## Architecture
+
+- Status: `<required and updated / not needed>`
+- Architecture file: `<docs/issues/<issue-number>/architecture.md / not needed>`
+- Review note: `<what changed architecturally, or why no architecture digest is needed>`
+
 ## Files To Read First
 
 1. `<tests to start with>`
@@ -92,9 +98,12 @@ Use this file as `docs/issues/<issue-number>/handoff.md`.
 
 ## DeployAgent
 
-### SlackMessage (if MCP unavailable)
+### SlackMessage
 
-- `<Issue #X ready for review on branch X. Changes: 1) ... 2) ... 3) ...>`
+- IssueAgent status: `<sent via MCP / fallback recorded / pending>`
+- IssueAgent message: `<Starting issue #X: ...>`
+- DeployAgent status: `<sent via MCP / fallback recorded / pending>`
+- DeployAgent message: `<Issue #X ready for review on branch X. Changes: 1) ... 2) ... 3) ...>`
 
 ### Release Readiness
 

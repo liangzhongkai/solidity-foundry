@@ -31,7 +31,16 @@ htmlcov/
 # IDE & Editor
 .vscode/
 .idea/
-.claude/
+.claude/*
+!.claude/agents/
+!.claude/agents/**
+!.claude/hooks/
+!.claude/hooks/**
+!.claude/skills/
+!.claude/skills/**
+!.claude/settings.json
+!.claude/CLAUDE.md
+.claude/*.local.*
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
