@@ -16,6 +16,12 @@ Minimal Wallet proof entrypoint:
 certoraRun certora/confs/Wallet.conf
 ```
 
+The most commonly used command is:
+
+```bash
+certoraRun contractFile:contractName --verify contractName:specFile
+```
+
 The current baseline focuses on access control and owner safety:
 
 - only the current owner can call `withdraw`

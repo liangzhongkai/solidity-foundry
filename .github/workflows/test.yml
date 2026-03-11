@@ -70,7 +70,26 @@ jobs:
           test-limit: 5000
           solc-version: "0.8.20"
 
-      - name: Manticore (符号执行)
+  manticore:
+    name: Manticore (符号执行)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Run Manticore verifier
         run: |
           python -m venv .manticore-venv
           . .manticore-venv/bin/activate
