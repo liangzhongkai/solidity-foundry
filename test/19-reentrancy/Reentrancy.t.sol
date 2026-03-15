@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
+import {console} from "forge-std@1.14.0/console.sol";
 import {VulnerableVault, ClassicAttack, SafeVault} from "../../src/19-reentrancy/ClassicReentrancy.sol";
 import {PriceOracle, LendingProtocol, ReadOnlyAttack} from "../../src/19-reentrancy/ReadOnlyReentrancy.sol";
 import {TokenPool, RewardDistributor, CrossContractAttack} from "../../src/19-reentrancy/CrossContractReentrancy.sol";
@@ -57,8 +58,9 @@ contract ReentrancyTest is Test {
         vm.prank(attacker);
         attack.attack{value: 150 ether}();
 
+        console.log("address(attack).balance", address(attack).balance);
         assertGe(
-            address(attack).balance, 100 ether, "attack borrowed 100 ETH with 1 wei collateral via read-only reentrancy"
+            address(attack).balance, 249 ether, "attack borrowed 100 ETH with 1 wei collateral via read-only reentrancy"
         );
     }
 
