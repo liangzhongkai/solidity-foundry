@@ -4,7 +4,7 @@ Project-centric state for architecture, design, and implementation. Load at star
 
 ## Current Architecture
 
-- Modules in `src/01-slot-packing/` through `src/18-advanced-erc20/`; each folder is self-contained.
+- Modules in `src/01-slot-packing/` through `src/19-reentrancy/`; each folder is self-contained.
 - Reference: `docs/issues/12/architecture.md` for issue-specific diagrams.
 
 ## Module Boundaries
@@ -13,6 +13,7 @@ Project-centric state for architecture, design, and implementation. Load at star
 - ERC1155Bingo: standalone; extends OpenZeppelin ERC1155; no cross-module calls.
 - OnChainBlackjack: standalone; no cross-module calls; no ETH/token transfers.
 - AdvancedERC20: standalone; no cross-module calls. Uses OpenZeppelin Ownable, AccessControl, Pausable, custom ReentrancyGuard.
+- Reentrancy (#13): standalone; three demo pairs (classic, read-only, cross-contract); vulnerable + attack + fixed contracts.
     - Custom ReentrancyGuard mutex pattern
     - Ownable for simple admin functions
     - AccessControl for granular role-based permissions (MINTER_ROLE, PAUSER_ROLE)
@@ -55,4 +56,4 @@ Project-centric state for architecture, design, and implementation. Load at star
 
 ## Last Updated
 
-- Issue #12, 2026-03-10
+- Issue #13, 2026-03-15

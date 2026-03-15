@@ -4,7 +4,7 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 
 ## Release Hygiene
 
-- Branch: `issue-12-erc20-advanced` from main.
+- Branch: `issue-13-reentrancy-cases` from main.
 - Commit when validation passes; do not merge without user approval.
 
 ## Handoff Completeness
@@ -53,4 +53,4 @@ Never claim a bug is fixed without a test or other verifiable proof.
 
 ## Last Updated
 
-- Issue #12, 2026-03-10
+- Issue #13, 2026-03-15

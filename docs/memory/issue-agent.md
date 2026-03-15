@@ -12,6 +12,7 @@ Project-centric state for requirement analysis and conflict resolution. Load at 
 - ERC1155 Bingo (#10): ERC1155 tokens 1-25, 5x5 grid per player, draw every n blocks, first 5-in-row wins.
 - On-chain Blackjack (#11): Open hands, blockhash RNG (2-9: 1/13, 10: 4/13, Ace: 1/13), dealer hits until 17, 10-block move timeout.
 - Advanced ERC20 (#12): EIP-2612 permit + EIP-5805 vote delegation, Ownable + AccessControl, Pausable, custom ReentrancyGuard mutex.
+- Reentrancy demos (#13): 经典重入、read-only 重入、跨合约重入 三组教学示例。
 
 ## Rejected Directions
 
@@ -23,6 +24,7 @@ Project-centric state for requirement analysis and conflict resolution. Load at 
 - Issue #10: standalone ERC1155Bingo; blockhash for randomness.
 - Issue #11: standalone OnChainBlackjack; dealer threshold 17 (standard); issue text said "at least 21" but 17 used for playability.
 - Issue #12: standalone AdvancedERC20; builds on ProductionERC20 patterns but adds access control, pausable, and custom reentrancy guard.
+- Issue #13: standalone reentrancy demos; 19-reentrancy module.
 
 ## Prior Conflict Resolutions
 
@@ -30,4 +32,4 @@ Project-centric state for requirement analysis and conflict resolution. Load at 
 
 ## Last Updated
 
-- Issue #12, 2026-03-10
+- Issue #13, 2026-03-15

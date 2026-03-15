@@ -27,4 +27,4 @@ Project-centric state for attack patterns and defensive techniques. Load at star
 
 ## Last Updated
 
-- Issue #12, 2026-03-10
+- Issue #13, 2026-03-15
