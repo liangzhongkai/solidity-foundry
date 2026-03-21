@@ -60,4 +60,4 @@ Never claim a bug is fixed without a test or other verifiable proof.
 
 ## Last Updated
 
-- Issue #14, 2026-03-21: validation re-run passed; ready-for-review Slack sent via MCP; committed `src/20-uniswap-v2/`, `test/20-uniswap-v2/`, `docs/issues/14/`, and `docs/memory/*.md` on `issue-14-uniswap-v2-example`.
+- Issue #14, 2026-03-21: validation re-run passed; ready-for-review Slack sent via MCP; committed on `issue-14-uniswap-v2-example`; pushed branch and `main` to `origin`; GitHub issue #14 closed as completed (`state_reason: completed`).
