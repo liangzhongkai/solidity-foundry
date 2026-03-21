@@ -24,7 +24,13 @@ Project-centric state for attack patterns and defensive techniques. Load at star
 - blockhash lookback 256 blocks; claim must occur within [drawBlock+1, drawBlock+256].
 - EIP-2612 permit: deadline + nonce prevents replay; ecrecover for signature recovery.
 - EIP-5805 delegation: same checkpoint update pattern as OpenZeppelin ERC20Votes.
+- Educational AMM integrations that custody LP tokens or redeemed assets without per-user accounting can permit permissionless griefing even when they do not expose a direct theft path; document that tradeoff explicitly and avoid implying production safety.
+- Canonical-token fork tests prove router/factory wiring, but they do not establish safety for arbitrary ERC20s; fee-on-transfer, rebasing, and callback-enabled tokens need separate coverage before reuse.
+- For router-based swap demos, validate both direct and WETH-routed paths because path-construction mistakes often hide behind passing single-hop tests.
+- For one-sided liquidity "optimal zap" demos, compare strategies using relative LP output on the same fork state; leftover dust can be non-deterministically tiny and is a poor security or correctness oracle.
+- Teaching-only zap flows that hardcode `amountOutMin` or `amount{A,B}Min` to near-zero are acceptable only when explicitly documented as demo code; otherwise they create avoidable sandwich and slippage-griefing risk if copied into live integrations.
+- Reserve-selection logic for AMM pair helpers needs fork coverage for both token orderings; a single canonical pair test can miss the `token0 != tokenIn` branch entirely.
 
 ## Last Updated
 
-- Issue #13, 2026-03-15
+- Issue #14, 2026-03-16

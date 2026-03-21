@@ -4,7 +4,7 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 
 ## Release Hygiene
 
-- Branch: `issue-13-reentrancy-cases` from main.
+- Branch: `issue-14-uniswap-v2-example` from main.
 - Commit when validation passes; do not merge without user approval.
 
 ## Handoff Completeness
@@ -16,9 +16,15 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 ## Validation Flow
 
 1. forge fmt && forge fmt --check
-2. forge test --match-path test/18-advanced-erc20
-3. forge test (exclude FFI tests: --no-match-path "test/Vyper.t.sol")
-4. verification.md with exact commands and results
+2. forge test --match-path test/20-uniswap-v2/UniswapV2LiquidityExample.t.sol
+3. forge test --match-path test/20-uniswap-v2/UniswapV2SwapExample.t.sol
+4. forge test --match-path test/20-uniswap-v2/UniswapV2OptimalZap.t.sol
+5. forge test --fork-url https://ethereum.publicnode.com --match-path test/20-uniswap-v2/UniswapV2LiquidityExample.t.sol -vv
+6. forge test --fork-url https://ethereum.publicnode.com --match-path test/20-uniswap-v2/UniswapV2SwapExample.t.sol -vv
+7. forge test --fork-url https://ethereum.publicnode.com --match-path test/20-uniswap-v2/UniswapV2OptimalZap.t.sol -vv
+8. forge test --ffi
+9. slither src/20-uniswap-v2/UniswapV2LiquidityExample.sol --config-file slither.config.json
+6. verification.md with exact commands and results
 
 ## Merge Authorization Rules
 
@@ -29,7 +35,7 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 ## Slack Fallback Rule
 
 If Slack MCP is unavailable:
-1. Record the exact Slack message in docs/issues/12/handoff.md under SlackMessage.
+1. Record the exact Slack message in docs/issues/14/handoff.md under SlackMessage.
 2. Tell the user exactly: `请手动在 Slack 发送以下消息`
 3. Paste the full message that must be sent.
 
@@ -38,9 +44,10 @@ If Slack MCP is unavailable:
 For Solidity issue work:
 1. forge fmt
 2. forge fmt --check
-3. targeted tests with forge test --match-path test/18-advanced-erc20
-4. forge test before handoff
-5. Slither analysis when configured
+3. targeted tests should enumerate each touched Uniswap demo flow rather than only one file
+4. real fork validation for integration-heavy modules
+5. forge test --ffi before handoff when the repo includes FFI-based tests
+6. Slither analysis when configured
 
 Never claim a bug is fixed without a test or other verifiable proof.
 
@@ -53,4 +60,4 @@ Never claim a bug is fixed without a test or other verifiable proof.
 
 ## Last Updated
 
-- Issue #13, 2026-03-15
+- Issue #14, 2026-03-21: validation re-run passed; ready-for-review Slack sent via MCP; committed `src/20-uniswap-v2/`, `test/20-uniswap-v2/`, `docs/issues/14/`, and `docs/memory/*.md` on `issue-14-uniswap-v2-example`.
