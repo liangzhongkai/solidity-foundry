@@ -19,8 +19,8 @@ flowchart LR
 
   L[UniswapV3PoolLens] -->|getPool / slot0| F
   L --> P
-  S[UniswapV3SwapExample] -->|exactInputSingle| R
-  M[UniswapV3LiquidityNftExample] -->|mint| N
+  S[UniswapV3SwapExample] -->|exactInputSingle / exactInput| R
+  M[UniswapV3LiquidityNftExample] -->|mint / decrease / collect / burn| N
   N --> F
   N --> P
 
@@ -34,12 +34,13 @@ flowchart LR
 ## Changed entry points
 
 - `UniswapV3PoolLens`: discover pool (either token order) and read `slot0` + liquidity.
-- `UniswapV3SwapExample.swapExactInputSingle`: single-pool exact-in swap via `SwapRouter`.
-- `UniswapV3LiquidityNftExample.mintPosition`: NPM `mint` with caller-supplied aligned ticks; `feeToTickSpacing` / `floorTickToSpacing` helpers for tick math.
+- `UniswapV3SwapExample.swapExactInputSingle` / `swapExactInput` / `encodePath`: single- and multi-hop exact-in swaps via `SwapRouter`.
+- `UniswapV3LiquidityNftExample`: `mintPosition`, `decreaseLiquidityAmount`, `collectFees`, `burnPositionFully`; tick helpers `feeToTickSpacing` / `floorTickToSpacing`.
 
 ## State / permission notes
 
 - All demos pull ERC20 from `msg.sender` (allowances required). NFT recipient is `msg.sender` on mint.
+- `decreaseLiquidity` / `collect` / `burn` are invoked **by this contract** on NPM, so the position owner must grant NPM ERC721 approval to `UniswapV3LiquidityNftExample` (`setApprovalForAll` or `approve`).
 - No admin roles; contracts are thin wrappers over canonical periphery/core.
 
 ## External effects / invariants worth reviewing

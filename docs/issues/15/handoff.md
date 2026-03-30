@@ -6,7 +6,7 @@
 
 ## Changed behavior
 
-- New teaching module `src/21-uniswap-v3/` with minimal interfaces and three demos: pool lens, `SwapRouter.exactInputSingle`, and `NonfungiblePositionManager.mint`.
+- New teaching module `src/21-uniswap-v3/` with minimal interfaces: pool lens; `SwapRouter.exactInputSingle`, packed-path `exactInput` + `encodePath`; NPM `mint`, `decreaseLiquidity`, `collect`, and `burn` (via `burnPositionFully`).
 - New fork-oriented tests under `test/21-uniswap-v3/`; non-fork runs skip when bytecode is absent (same pattern as issue #14).
 
 ## Architecture digest
@@ -26,6 +26,7 @@
 - Implemented minimal interfaces (no new git submodules) mirroring the V2 module style.
 - NPM mainnet address corrected to `0xC36442b4a4522E871399CD717aBDD847Ab11FE88` (previous checksum-colliding literals are easy to mistake).
 - `mintPosition` takes explicit `tickLower`/`tickUpper`; tests build a symmetric window via `slot0` + `feeToTickSpacing` / `floorTickToSpacing` to avoid solc “stack too deep” without enabling `via_ir` project-wide.
+- Multi-hop fork test uses WBTC→WETH (0.05%)→DAI (0.3%) as a realistic mainnet path encoding example.
 
 ## SecurityAgent
 
@@ -72,3 +73,4 @@
 
 - **IssueAgent start**: `Starting issue #15: task: 新建案例展示uniswap-v3的接口使用. Breakdown: 1) Add teaching module covering common Uniswap V3 interfaces (pool, positions, swaps) 2) Foundry tests with fork showing usage patterns and production caveats 3) Align with repo style (src/NN-topic/, interfaces, optional fork skips)` — **sent via MCP** (Slack workspace)
 - **DeployAgent ready**: `Issue #15 ready for review on branch issue-15-uniswap-v3-example. Changes: 1) add src/21-uniswap-v3 demos for pool lens, SwapRouter exactInputSingle, and NPM mint with tick helpers 2) add fork-based Foundry tests and issue docs (analysis, architecture, handoff, verification) 3) run forge fmt, forge test --ffi, and targeted Slither on new contracts` — **sent via MCP** (after validation)
+

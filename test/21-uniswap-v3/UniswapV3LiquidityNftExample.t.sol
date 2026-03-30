@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {IERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/IERC721.sol";
 
 import {UniswapV3LiquidityNftExample} from "../../src/21-uniswap-v3/UniswapV3LiquidityNftExample.sol";
 import {
@@ -15,7 +16,7 @@ interface IWETH {
     function deposit() external payable;
 }
 
-/// @notice Unit tests for tick math plus fork mint flow against canonical mainnet NPM.
+/// @notice Tick math (no fork) plus fork flows for mint / decrease / collect / burn.
 contract UniswapV3LiquidityNftExampleTest is Test {
     address internal constant NPM = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
     address internal constant FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
@@ -27,9 +28,10 @@ contract UniswapV3LiquidityNftExampleTest is Test {
 
     function setUp() public {
         example = new UniswapV3LiquidityNftExample(NPM);
-        if (NPM.code.length == 0) {
-            vm.skip(true);
-        }
+    }
+
+    function _skipIfNoNpm() internal {
+        if (NPM.code.length == 0) vm.skip(true);
     }
 
     function testFeeToTickSpacingMatchesV3Constants() public view {
@@ -46,6 +48,7 @@ contract UniswapV3LiquidityNftExampleTest is Test {
 
     /// @dev Mint sends the NFT to `msg.sender`; asymmetric deposits are normal when price sits inside the range.
     function testMintPositionCreatesNft() public {
+        _skipIfNoNpm();
         address lp = makeAddr("lp");
         vm.deal(lp, 5 ether);
         vm.startPrank(lp);
@@ -77,6 +80,7 @@ contract UniswapV3LiquidityNftExampleTest is Test {
 
     /// @dev NPM reverts when ticks are not on spacing boundaries — production integrators must align off-chain or via `floorTickToSpacing`.
     function testMintRevertsWhenTicksMisaligned() public {
+        _skipIfNoNpm();
         address lp = makeAddr("lp");
         vm.deal(lp, 1 ether);
         vm.startPrank(lp);
@@ -93,6 +97,65 @@ contract UniswapV3LiquidityNftExampleTest is Test {
             WETH, DAI, FEE_030, tickLower, tickUpper, 0.5 ether, 1_000 ether, 0, 0, block.timestamp + 1 hours
         );
         vm.stopPrank();
+    }
+
+    /// @dev `decreaseLiquidity` moves principal to `tokensOwed`; `collect` delivers tokens to the recipient (needs NPM approval on this helper).
+    function testDecreaseHalfThenCollect() public {
+        _skipIfNoNpm();
+        address lp = makeAddr("lp");
+        vm.deal(lp, 5 ether);
+        vm.startPrank(lp);
+        IWETH(WETH).deposit{value: 2 ether}();
+        deal(DAI, lp, 5_000 ether);
+        IERC20(WETH).approve(address(example), 2 ether);
+        IERC20(DAI).approve(address(example), 5_000 ether);
+
+        (int24 lower, int24 upper) = _symmetricTickWindow(WETH, DAI, FEE_030, 600);
+        uint256 tokenId = example.mintPosition(
+            WETH, DAI, FEE_030, lower, upper, 2 ether, 5_000 ether, 0, 0, block.timestamp + 1 hours
+        );
+
+        (,,,,,,, uint128 liq,,,,) = INonfungiblePositionManager(NPM).positions(tokenId);
+        assertGt(liq, 1);
+
+        IERC721(NPM).setApprovalForAll(address(example), true);
+
+        uint256 daiBefore = IERC20(DAI).balanceOf(lp);
+        uint256 wethBefore = IERC20(WETH).balanceOf(lp);
+
+        uint128 half = liq / 2;
+        example.decreaseLiquidityAmount(tokenId, half, 0, 0, block.timestamp + 1 hours);
+        example.collectFees(tokenId, lp, type(uint128).max, type(uint128).max);
+
+        assertTrue(IERC20(DAI).balanceOf(lp) + IERC20(WETH).balanceOf(lp) > daiBefore + wethBefore);
+
+        (,,,,,,, uint128 liqAfter,,,,) = INonfungiblePositionManager(NPM).positions(tokenId);
+        assertEq(liqAfter, liq - half);
+        vm.stopPrank();
+    }
+
+    /// @dev Full exit: decrease all, collect to LP, burn NFT — requires NPM approval for the helper contract.
+    function testBurnPositionFullyDestroysPosition() public {
+        _skipIfNoNpm();
+        address lp = makeAddr("lp");
+        vm.deal(lp, 5 ether);
+        vm.startPrank(lp);
+        IWETH(WETH).deposit{value: 1 ether}();
+        deal(DAI, lp, 2_000 ether);
+        IERC20(WETH).approve(address(example), 1 ether);
+        IERC20(DAI).approve(address(example), 2_000 ether);
+
+        (int24 lower, int24 upper) = _symmetricTickWindow(WETH, DAI, FEE_030, 600);
+        uint256 tokenId = example.mintPosition(
+            WETH, DAI, FEE_030, lower, upper, 1 ether, 2_000 ether, 0, 0, block.timestamp + 1 hours
+        );
+
+        IERC721(NPM).setApprovalForAll(address(example), true);
+        example.burnPositionFully(tokenId, 0, 0, block.timestamp + 1 hours);
+        vm.stopPrank();
+
+        vm.expectRevert();
+        IERC721(NPM).ownerOf(tokenId);
     }
 
     function _symmetricTickWindow(address tokenA, address tokenB, uint24 fee, int24 halfWidthTicks)

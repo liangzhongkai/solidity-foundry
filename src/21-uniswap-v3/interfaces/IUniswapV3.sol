@@ -40,6 +40,17 @@ interface ISwapRouter {
     }
 
     function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
+
+    /// @dev Multi-hop exact input. `path` is packed as `tokenIn | uint24 fee | token | uint24 fee | ... | tokenOut` (20+3 bytes per hop).
+    struct ExactInputParams {
+        bytes path;
+        address recipient;
+        uint256 deadline;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+    }
+
+    function exactInput(ExactInputParams calldata params) external payable returns (uint256 amountOut);
 }
 
 /// @dev NFT positions manager for concentrated liquidity.
@@ -101,6 +112,9 @@ interface INonfungiblePositionManager {
         external
         payable
         returns (uint256 amount0, uint256 amount1);
+
+    /// @dev Requires `liquidity == 0` and no outstanding owed tokens; usually preceded by `decreaseLiquidity` + `collect`.
+    function burn(uint256 tokenId) external payable;
 
     function positions(uint256 tokenId)
         external

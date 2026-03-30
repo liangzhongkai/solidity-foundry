@@ -16,13 +16,15 @@ contract UniswapV3PoolLensTest is Test {
 
     function setUp() public {
         lens = new UniswapV3PoolLens(FACTORY);
-        if (FACTORY.code.length == 0) {
-            vm.skip(true);
-        }
+    }
+
+    function _skipIfNoFork() internal {
+        if (FACTORY.code.length == 0) vm.skip(true);
     }
 
     /// @dev Shows `getPool` works with either token ordering — integrators still pass sorted tokens to mint.
-    function testGetPoolIsSymmetricForTokenOrder() public view {
+    function testGetPoolIsSymmetricForTokenOrder() public {
+        _skipIfNoFork();
         address p0 = lens.getPool(WETH, DAI, FEE_030);
         address p1 = lens.getPool(DAI, WETH, FEE_030);
         assertEq(p0, p1);
@@ -30,7 +32,8 @@ contract UniswapV3PoolLensTest is Test {
     }
 
     /// @dev `slot0` gives the live sqrt price and tick; do not treat it as a binding quote for the next block.
-    function testReadPoolStateReturnsOrderedTokensAndLiquidity() public view {
+    function testReadPoolStateReturnsOrderedTokensAndLiquidity() public {
+        _skipIfNoFork();
         (uint160 sqrtPriceX96, int24 tick, uint128 liquidity, address token0, address token1) =
             lens.readPoolState(WETH, DAI, FEE_030);
 
@@ -46,7 +49,11 @@ contract UniswapV3PoolLensTest is Test {
     function testReadPoolStateRevertsWhenPoolMissing() public {
         address fakeA = makeAddr("fakeA");
         address fakeB = makeAddr("fakeB");
-        vm.expectRevert(UniswapV3PoolLens.PoolNotFound.selector);
+        if (FACTORY.code.length == 0) {
+            vm.expectRevert();
+        } else {
+            vm.expectRevert(UniswapV3PoolLens.PoolNotFound.selector);
+        }
         lens.readPoolState(fakeA, fakeB, FEE_030);
     }
 }
