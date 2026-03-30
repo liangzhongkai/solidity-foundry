@@ -6,7 +6,17 @@ interface IUniswapV3Factory {
     function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool);
 }
 
-/// @dev Minimal pool surface: price, ticks, and liquidity.
+/// @dev Pool invokes this on `msg.sender` during `swap`.
+interface IUniswapV3SwapCallback {
+    function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external;
+}
+
+/// @dev Pool invokes this on `msg.sender` during `flash`.
+interface IUniswapV3FlashCallback {
+    function uniswapV3FlashCallback(uint256 fee0, uint256 fee1, bytes calldata data) external;
+}
+
+/// @dev Minimal pool surface: price, ticks, liquidity, swap, and flash.
 interface IUniswapV3Pool {
     function token0() external view returns (address);
     function token1() external view returns (address);
@@ -24,6 +34,16 @@ interface IUniswapV3Pool {
             uint8 feeProtocol,
             bool unlocked
         );
+
+    function swap(
+        address recipient,
+        bool zeroForOne,
+        int256 amountSpecified,
+        uint160 sqrtPriceLimitX96,
+        bytes calldata data
+    ) external returns (int256 amount0, int256 amount1);
+
+    function flash(address recipient, uint256 amount0, uint256 amount1, bytes calldata data) external;
 }
 
 /// @dev Canonical V3 swap router (`SwapRouter` on Ethereum mainnet).

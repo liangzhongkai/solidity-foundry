@@ -61,4 +61,4 @@ Never claim a bug is fixed without a test or other verifiable proof.
 
 ## Last Updated
 
-- Issue #15, 2026-03-30: validation passed (`forge fmt --check`, `forge test --ffi`); ready-for-review Slack sent via MCP; committed and pushed `issue-15-uniswap-v3-example` to `origin` (merge to `main` / close issue #15 only after user approval).
+- Issue #15, 2026-03-30: validation passed (`forge fmt --check`, `forge test --ffi`); ready-for-review Slack sent via MCP; merged `issue-15-uniswap-v3-example` into `main`, pushed `main` to `origin`, GitHub issue #15 closed as completed (`state_reason: completed`).
