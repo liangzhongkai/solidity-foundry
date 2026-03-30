@@ -11,7 +11,25 @@
       "rev": "c64a1edb67b6e3f4a15cca8909c9482ad33a02b0"
     }
   },
+  "lib/openzeppelin-contracts-v3": {
+    "tag": {
+      "name": "v3.4.2",
+      "rev": "8e0296096449d9b1cd7c5631e917330635244c37"
+    }
+  },
+  "lib/solidity-lib": {
+    "tag": {
+      "name": "v4.0.0-alpha",
+      "rev": "30e87d07077467d39e35f3ed0fa830cb92906df9"
+    }
+  },
   "lib/solmate": {
     "rev": "89365b880c4f3c786bdd453d4b8e8fe410344a69"
+  },
+  "lib/v2-core": {
+    "tag": {
+      "name": "v1.0.1",
+      "rev": "4dd59067c76dea4a0e8e4bfdda41877a6b16dedc"
+    }
   }
 }

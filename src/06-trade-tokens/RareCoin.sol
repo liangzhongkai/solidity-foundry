@@ -2,8 +2,8 @@
 pragma solidity 0.8.20;
 
 import {ERC20} from "../02-erc20/ERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @title RareCoin
 /// @notice ERC-20 token obtainable only by trading SkillsCoin. The only way to get RareCoin

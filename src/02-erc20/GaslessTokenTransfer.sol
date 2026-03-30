@@ -2,8 +2,8 @@
 pragma solidity 0.8.20;
 
 import {IERC20Permit} from "./IERC20Permit.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 /// @title GaslessTokenTransfer
 /// @notice Enables gasless token transfer via EIP-2612 permit
