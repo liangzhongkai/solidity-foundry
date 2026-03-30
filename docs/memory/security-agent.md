@@ -30,7 +30,9 @@ Project-centric state for attack patterns and defensive techniques. Load at star
 - For one-sided liquidity "optimal zap" demos, compare strategies using relative LP output on the same fork state; leftover dust can be non-deterministically tiny and is a poor security or correctness oracle.
 - Teaching-only zap flows that hardcode `amountOutMin` or `amount{A,B}Min` to near-zero are acceptable only when explicitly documented as demo code; otherwise they create avoidable sandwich and slippage-griefing risk if copied into live integrations.
 - Reserve-selection logic for AMM pair helpers needs fork coverage for both token orderings; a single canonical pair test can miss the `token0 != tokenIn` branch entirely.
+- Uniswap V3 concentrated liquidity: misaligned ticks and wrong fee tiers are the fastest foot-gun; treat `slot0` as non-authoritative for user-facing quotes. NPM address mistakes (40-hex typos) silently break fork tests — verify against official deployment docs.
+- Router `exactInputSingle` demos must pair `amountOutMinimum` education with warnings about sandwich risk when mins are loose (tests use permissive floors only to observe live behavior).
 
 ## Last Updated
 
-- Issue #14, 2026-03-16
+- Issue #15, 2026-03-30

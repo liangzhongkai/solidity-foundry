@@ -4,7 +4,7 @@ Project-centric state for architecture, design, and implementation. Load at star
 
 ## Current Architecture
 
-- Modules in `src/01-slot-packing/` through `src/20-uniswap-v2/`; each folder is self-contained.
+- Modules in `src/01-slot-packing/` through `src/21-uniswap-v3/`; each folder is self-contained.
 - Reference: `docs/issues/12/architecture.md` for issue-specific diagrams.
 
 ## Module Boundaries
@@ -31,6 +31,7 @@ Project-centric state for architecture, design, and implementation. Load at star
 - Lottery params (TICKET_PRICE, PURCHASE_WINDOW) could be made configurable per lottery.
 - AdvancedERC20 roles can be extended with additional roles (e.g., BURNER_ROLE separate from MINTER_ROLE).
 - Uniswap example could grow a safer wrapper with per-user accounting, recipient selection, or dedicated recovery/withdraw flows if a future issue wants a production-style pattern.
+- Uniswap V3 example (#15): prefer explicit tick inputs plus pure/view tick helpers in the demo contract; keep `mint` stack shallow to avoid requiring `via_ir` for the whole repo.
 - The zap example can be extended with multi-hop swaps or automatic dust return if a later issue wants a more product-like UX instead of pure protocol demonstration.
 
 ## Test Strategy
@@ -38,6 +39,7 @@ Project-centric state for architecture, design, and implementation. Load at star
 - Unit tests with vm.warp, vm.roll for time/block manipulation.
 - AdvancedERC20: 57 tests covering ERC20, permit, delegation, access control, pausable, fuzz tests.
 - Uniswap V2 example: default suite verifies clean skip behavior without a fork; targeted fork tests validate liquidity add/remove, indirect routed swaps, and optimal-vs-suboptimal zap behavior against live mainnet protocol state.
+- Uniswap V3 example: skip in `setUp` when router/factory/NPM bytecode missing; fork tests cover pool lens, `exactInputSingle`, NPM `mint`, fee-tier revert, and tick-spacing misalignment.
 
 ## Performance Constraints
 
@@ -49,4 +51,4 @@ Project-centric state for architecture, design, and implementation. Load at star
 
 ## Last Updated
 
-- Issue #14, 2026-03-16
+- Issue #15, 2026-03-30

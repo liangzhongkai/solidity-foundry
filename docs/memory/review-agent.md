@@ -20,7 +20,8 @@ Project-centric state for quality bar and review consistency. Load at start, upd
 - AccessControl role tests: vm.prank may not work with _msgSender() in inherited contracts; use simpler verification.
 - Live AMM comparisons should avoid assertions that mix token units directly; prefer route correctness, revert guards, and relative LP or output comparisons.
 - Issue #14: when a swap demo advertises both direct-WETH and WETH-routed paths, keep one test for each path plus one local guard-path test so the review packet proves routing and input validation separately.
+- Issue #15: V3 modules should document fork skip behavior, canonical periphery addresses (especially NPM), and that tick windows are constructed relative to live `slot0` in tests.
 
 ## Last Updated
 
-- Issue #14, 2026-03-16 follow-up review pass
+- Issue #15, 2026-03-30

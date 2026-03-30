@@ -4,7 +4,7 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 
 ## Release Hygiene
 
-- Branch: `issue-14-uniswap-v2-example` from main.
+- Branch: `issue-15-uniswap-v3-example` from main (prior: `issue-14-uniswap-v2-example`).
 - Commit when validation passes; do not merge without user approval.
 
 ## Handoff Completeness
@@ -23,8 +23,9 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 6. forge test --fork-url https://ethereum.publicnode.com --match-path test/20-uniswap-v2/UniswapV2SwapExample.t.sol -vv
 7. forge test --fork-url https://ethereum.publicnode.com --match-path test/20-uniswap-v2/UniswapV2OptimalZap.t.sol -vv
 8. forge test --ffi
-9. slither src/20-uniswap-v2/UniswapV2LiquidityExample.sol --config-file slither.config.json
-6. verification.md with exact commands and results
+9. slither on newly touched contracts under `src/21-uniswap-v3/` (expect informational `solc-version` noise)
+10. Optional: `forge test --fork-url $MAINNET_RPC_URL --match-path test/21-uniswap-v3/** -vv`
+11. verification.md with exact commands and results
 
 ## Merge Authorization Rules
 
@@ -35,7 +36,7 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 ## Slack Fallback Rule
 
 If Slack MCP is unavailable:
-1. Record the exact Slack message in docs/issues/14/handoff.md under SlackMessage.
+1. Record the exact Slack message in `docs/issues/<n>/handoff.md` under SlackMessage.
 2. Tell the user exactly: `请手动在 Slack 发送以下消息`
 3. Paste the full message that must be sent.
 
@@ -60,4 +61,4 @@ Never claim a bug is fixed without a test or other verifiable proof.
 
 ## Last Updated
 
-- Issue #14, 2026-03-21: validation re-run passed; ready-for-review Slack sent via MCP; committed on `issue-14-uniswap-v2-example`; pushed branch and `main` to `origin`; GitHub issue #14 closed as completed (`state_reason: completed`).
+- Issue #15, 2026-03-30: validation passed (`forge fmt --check`, `forge test --ffi`); ready-for-review Slack sent via MCP; commit pending on `issue-15-uniswap-v3-example` (merge/push only after user approval).
