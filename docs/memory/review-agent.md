@@ -12,6 +12,7 @@ Project-centric state for quality bar and review consistency. Load at start, upd
 - AdvancedERC20 (#12): All quality checks pass; 57 tests; NatSpec complete; custom errors throughout.
 - Issue #14: For fork-only teaching modules, distinguish between verifying the clean skip path and verifying live protocol interaction. If the environment cannot reach forked contracts, record that the happy path remains unproven in that run and call out any untested local guard rails explicitly.
 - Issue #14 follow-up: when issue comments expand a protocol-demo scope, update the issue packet and validation evidence to enumerate each new flow separately rather than folding everything into one "integration test" claim.
+- Issue #16: when V4 singleton execution is environment-limited, pair skip-capable fork tests with deterministic mock-backed wrapper tests so the review packet still proves local correctness rather than only compilation.
 
 ## Testing Blind Spots
 
@@ -21,7 +22,8 @@ Project-centric state for quality bar and review consistency. Load at start, upd
 - Live AMM comparisons should avoid assertions that mix token units directly; prefer route correctness, revert guards, and relative LP or output comparisons.
 - Issue #14: when a swap demo advertises both direct-WETH and WETH-routed paths, keep one test for each path plus one local guard-path test so the review packet proves routing and input validation separately.
 - Issue #15: V3 modules should document fork skip behavior, canonical periphery addresses (especially NPM), and that tick windows are constructed relative to live `slot0` in tests.
+- Issue #16: for V4 singleton wrappers, review both the raw callback path and the higher-level Permit2/router path; subtle settlement or spender mistakes can hide behind pure calldata-encoding tests unless wrapper logic is mocked end-to-end.
 
 ## Last Updated
 
-- Issue #15, 2026-03-30
+- Issue #16, 2026-04-02

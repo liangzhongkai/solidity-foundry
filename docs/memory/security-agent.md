@@ -32,7 +32,9 @@ Project-centric state for attack patterns and defensive techniques. Load at star
 - Reserve-selection logic for AMM pair helpers needs fork coverage for both token orderings; a single canonical pair test can miss the `token0 != tokenIn` branch entirely.
 - Uniswap V3 concentrated liquidity: misaligned ticks and wrong fee tiers are the fastest foot-gun; treat `slot0` as non-authoritative for user-facing quotes. NPM address mistakes (40-hex typos) silently break fork tests — verify against official deployment docs.
 - Router `exactInputSingle` demos must pair `amountOutMinimum` education with warnings about sandwich risk when mins are loose (tests use permissive floors only to observe live behavior).
+- Uniswap V4 singleton wrappers should separate deterministic wrapper logic from environment-sensitive live-core execution; when `PoolManager.unlock()` cannot run because transient storage is unavailable, do not over-claim integration proof.
+- Permit2-forwarding demo wrappers should be explicit that they are temporarily custodial: they pull tokens into the wrapper, forward allowance, execute, then refund leftovers.
 
 ## Last Updated
 
-- Issue #15, 2026-03-30
+- Issue #16, 2026-04-02

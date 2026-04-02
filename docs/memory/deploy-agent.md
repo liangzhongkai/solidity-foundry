@@ -4,7 +4,7 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 
 ## Release Hygiene
 
-- Branch: `issue-15-uniswap-v3-example` from main (prior: `issue-14-uniswap-v2-example`).
+- Branch: `issue-16-uniswap-v4-mev-example` from main (prior: `issue-15-uniswap-v3-example`).
 - Commit when validation passes; do not merge without user approval.
 
 ## Handoff Completeness
@@ -15,17 +15,12 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 
 ## Validation Flow
 
-1. forge fmt && forge fmt --check
-2. forge test --match-path test/20-uniswap-v2/UniswapV2LiquidityExample.t.sol
-3. forge test --match-path test/20-uniswap-v2/UniswapV2SwapExample.t.sol
-4. forge test --match-path test/20-uniswap-v2/UniswapV2OptimalZap.t.sol
-5. forge test --fork-url https://ethereum.publicnode.com --match-path test/20-uniswap-v2/UniswapV2LiquidityExample.t.sol -vv
-6. forge test --fork-url https://ethereum.publicnode.com --match-path test/20-uniswap-v2/UniswapV2SwapExample.t.sol -vv
-7. forge test --fork-url https://ethereum.publicnode.com --match-path test/20-uniswap-v2/UniswapV2OptimalZap.t.sol -vv
-8. forge test --ffi
-9. slither on newly touched contracts under `src/21-uniswap-v3/` (expect informational `solc-version` noise)
-10. Optional: `forge test --fork-url $MAINNET_RPC_URL --match-path test/21-uniswap-v3/** -vv`
-11. verification.md with exact commands and results
+1. `forge fmt` and `forge fmt --check`
+2. `forge test --match-path "test/22-uniswap-v4/*.t.sol" -vv`
+3. `forge test --match-path "test/22-uniswap-v4/UniswapV4WrapperUnit.t.sol" -vv`
+4. `forge test --ffi`
+5. Attempt targeted fork validation for V4 and record whether transient-storage runtime support blocks `PoolManager.unlock()`
+6. `verification.md` with exact commands and results
 
 ## Merge Authorization Rules
 
@@ -61,4 +56,4 @@ Never claim a bug is fixed without a test or other verifiable proof.
 
 ## Last Updated
 
-- Issue #15, 2026-03-30: validation passed (`forge fmt --check`, `forge test --ffi`); ready-for-review Slack sent via MCP; merged `issue-15-uniswap-v3-example` into `main`, pushed `main` to `origin`, GitHub issue #15 closed as completed (`state_reason: completed`).
+- Issue #16, 2026-04-02: validation passed for formatting, default V4 suites, mock-backed wrapper tests, and `forge test --ffi`; targeted fork validation remained environment-limited because `PoolManager.unlock()` hit transient-storage activation failures, and the limitation was recorded in `docs/issues/16/verification.md`.
