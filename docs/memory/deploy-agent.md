@@ -4,7 +4,7 @@ Project-centric state for release hygiene and handoff. Load at start, update at 
 
 ## Release Hygiene
 
-- Branch: `issue-16-uniswap-v4-mev-example` from main (prior: `issue-15-uniswap-v3-example`).
+- Branch: `issue-17-rareskills-gas-optimization` from main (prior: `issue-16-uniswap-v4-mev-example`).
 - Commit when validation passes; do not merge without user approval.
 
 ## Handoff Completeness
@@ -56,4 +56,4 @@ Never claim a bug is fixed without a test or other verifiable proof.
 
 ## Last Updated
 
-- Issue #16, 2026-04-02: validation passed for formatting, default V4 suites, mock-backed wrapper tests, and `forge test --ffi`; targeted fork validation remained environment-limited because `PoolManager.unlock()` hit transient-storage activation failures, and the limitation was recorded in `docs/issues/16/verification.md`.
+- Issue #17, 2026-04-12: validated `forge fmt`, `forge fmt --check`, targeted `test/23-rareskills-gas-optimization/RareSkillsGasOptimization.t.sol`, and `FOUNDRY_PROFILE=ci forge test --ffi`; recorded default `forge test` FFI limitation in `docs/issues/17/verification.md`.

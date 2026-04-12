@@ -62,6 +62,7 @@ pre-commit install   # Install git hooks (runs fmt check, build, test, slither, 
   - `06-trade-tokens/` - Token exchange contracts (RareCoin, SkillsCoin)
   - `07-foundry-nft/` - NFT implementation
   - `08-vesting/` - Time-locked ERC20 vesting (1/n tokens over n days)
+  - `23-rareskills-gas-optimization/` - RareSkills gas-optimization article mapped to teaching contracts + gas benchmarks
   - `echidna/` - Contracts for Echidna fuzzing
   - `manticore/` - Contracts for Manticore symbolic execution
 - `test/` - Foundry test files (`.t.sol` suffix)

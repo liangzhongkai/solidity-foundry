@@ -4,7 +4,7 @@ Project-centric state for architecture, design, and implementation. Load at star
 
 ## Current Architecture
 
-- Modules in `src/01-slot-packing/` through `src/22-uniswap-v4/`; each folder is self-contained.
+- Modules in `src/01-slot-packing/` through `src/23-rareskills-gas-optimization/`; each folder is self-contained.
 - Reference: `docs/issues/12/architecture.md` for issue-specific diagrams.
 
 ## Module Boundaries
@@ -16,6 +16,7 @@ Project-centric state for architecture, design, and implementation. Load at star
 - Reentrancy (#13): standalone; three demo pairs (classic, read-only, cross-contract); vulnerable + attack + fixed contracts.
 - Uniswap V2 example (#14): standalone router/factory/pair integration demo; uses canonical mainnet addresses and fork tests against live protocol state.
 - Uniswap V4 example (#16): standalone singleton/periphery demo using minimal local V4 ABIs plus focused wrappers for `StateView`, `PoolManager`, `Universal Router`, and `PositionManager`.
+- RareSkills gas optimization (#17): `src/23-rareskills-gas-optimization/` pairs naive vs optimized patterns; `README.md` is the canonical article bullet → symbol map; gas tests assert only when stable on `0.8.20`.
 
 ## Design Tradeoffs
 
@@ -36,6 +37,7 @@ Project-centric state for architecture, design, and implementation. Load at star
 - Uniswap V3 example (#15): prefer explicit tick inputs plus pure/view tick helpers in the demo contract; keep `mint` stack shallow to avoid requiring `via_ir` for the whole repo.
 - The zap example can be extended with multi-hop swaps or automatic dust return if a later issue wants a more product-like UX instead of pure protocol demonstration.
 - Uniswap V4 example can later add hook-specific demos, Quoter-specific off-chain helpers, or native-ETH settlement once the repo has a stable Cancun-capable fork workflow.
+- Gas microbenchmarks can invert across compiler patches; prefer logging both sides and asserting only when reproducible.
 
 ## Test Strategy
 
@@ -44,6 +46,7 @@ Project-centric state for architecture, design, and implementation. Load at star
 - Uniswap V2 example: default suite verifies clean skip behavior without a fork; targeted fork tests validate liquidity add/remove, indirect routed swaps, and optimal-vs-suboptimal zap behavior against live mainnet protocol state.
 - Uniswap V3 example: skip in `setUp` when router/factory/NPM bytecode missing; fork tests cover pool lens, `exactInputSingle`, NPM `mint`, fee-tier revert, and tick-spacing misalignment.
 - Uniswap V4 example: default mock-backed wrapper tests prove encoding, settlement, Permit2 forwarding, and PositionManager bookkeeping; fork-oriented suites should document when live singleton validation is blocked by transient-storage runtime issues.
+- RareSkills gas module: `test/23-rareskills-gas-optimization/RareSkillsGasOptimization.t.sol` uses `gasleft()` wrappers and `staticcall` for `view`/`pure` demos.
 
 ## Performance Constraints
 
@@ -56,4 +59,4 @@ Project-centric state for architecture, design, and implementation. Load at star
 
 ## Last Updated
 
-- Issue #16, 2026-04-02
+- Issue #17, 2026-04-12: added `23-rareskills-gas-optimization` teaching module with README-indexed article bullets and gas comparison tests; asserts only on stable compiler deltas.

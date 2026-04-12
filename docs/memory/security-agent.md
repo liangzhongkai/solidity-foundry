@@ -34,7 +34,8 @@ Project-centric state for attack patterns and defensive techniques. Load at star
 - Router `exactInputSingle` demos must pair `amountOutMinimum` education with warnings about sandwich risk when mins are loose (tests use permissive floors only to observe live behavior).
 - Uniswap V4 singleton wrappers should separate deterministic wrapper logic from environment-sensitive live-core execution; when `PoolManager.unlock()` cannot run because transient storage is unavailable, do not over-claim integration proof.
 - Permit2-forwarding demo wrappers should be explicit that they are temporarily custodial: they pull tokens into the wrapper, forward allowance, execute, then refund leftovers.
+- Gas optimization teaching code that exposes `delegatecall` batching (`multidelegatecall` style) must be framed as trusted-admin-only; arbitrary targets are full-chain compromise.
 
 ## Last Updated
 
-- Issue #16, 2026-04-02
+- Issue #17, 2026-04-12: noted delegatecall batching sketch risk in RareSkills gas module; no production integration surface added.
