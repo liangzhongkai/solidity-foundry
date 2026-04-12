@@ -18,3 +18,11 @@
 ## Blockers
 
 - None for merge review of issue #17 scope.
+
+## Post-merge (2026-04-12)
+
+| Step | Command / action | Result |
+|------|------------------|--------|
+| Merge to `main` | Fast-forward `main` to `issue-17-rareskills-gas-optimization` (`cca56bd`) | Done locally then pushed |
+| Push `main` | `git push origin main` | **Success** (`8bf1bd2..cca56bd`) |
+| Close GitHub #17 | `gh issue close 17` | **Skipped** — `gh` not authenticated in this environment; **close #17 manually** on GitHub if it is still open |

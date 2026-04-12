@@ -56,4 +56,4 @@ Never claim a bug is fixed without a test or other verifiable proof.
 
 ## Last Updated
 
-- Issue #17, 2026-04-12: validated `forge fmt`, `forge fmt --check`, targeted `test/23-rareskills-gas-optimization/RareSkillsGasOptimization.t.sol`, and `FOUNDRY_PROFILE=ci forge test --ffi`; recorded default `forge test` FFI limitation in `docs/issues/17/verification.md`.
+- Issue #17, 2026-04-12: user approved merge; `main` fast-forwarded and **pushed** to `origin` (`cca56bd`). GitHub issue **#17** could not be closed via `gh` (CLI not logged in) — user should close on github.com if still open. See `docs/issues/17/verification.md` post-merge table.
