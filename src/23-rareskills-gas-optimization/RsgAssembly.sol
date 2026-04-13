@@ -11,6 +11,7 @@ contract RsgAsm01SolidityRevert {
 }
 
 /// @notice Same custom error via raw assembly (`revert` with four-byte selector).
+/// @dev This skips the compiler's generic ABI-encoding scaffolding and writes only the selector bytes needed for the revert.
 contract RsgAsm01AssemblyRevert {
     function fail() external pure {
         bytes4 sel = RsgAsmErr.selector;
@@ -27,6 +28,7 @@ contract RsgAsm03MinSolidity {
     }
 }
 
+/// @notice The assembly branch writes the result directly, avoiding some Solidity codegen overhead for this tiny primitive.
 contract RsgAsm03MinAsm {
     function min(uint256 a, uint256 b) external pure returns (uint256 r) {
         assembly {
@@ -43,6 +45,7 @@ contract RsgAsm04IsZeroEq {
     }
 }
 
+/// @notice `xor(a, b)` is zero only when the values are equal, so this avoids a higher-level compare sequence.
 contract RsgAsm04Xor {
     function neq(uint256 a, uint256 b) external pure returns (bool r) {
         assembly {
@@ -57,6 +60,7 @@ contract RsgAsm05ZeroCheckSolidity {
     }
 }
 
+/// @notice `iszero(a)` maps directly to the EVM opcode for a zero-address test.
 contract RsgAsm05ZeroCheckAsm {
     function isZero(address a) external pure returns (bool r) {
         assembly {
@@ -71,6 +75,7 @@ contract RsgAsm06ThisBalance {
     }
 }
 
+/// @notice `selfbalance()` is a dedicated opcode that avoids the extra work behind `address(this).balance`.
 contract RsgAsm06SelfBalance {
     function bal() external view returns (uint256 v) {
         assembly {
@@ -85,6 +90,7 @@ contract RsgAsm07HashSolidity {
     }
 }
 
+/// @notice Write the three words contiguously and hash them directly to avoid `abi.encodePacked` helper overhead.
 contract RsgAsm07HashAsm {
     function h(bytes32 a, bytes32 b, bytes32 c) external pure returns (bytes32 r) {
         assembly {
@@ -103,6 +109,7 @@ contract RsgAsm10Mod {
     }
 }
 
+/// @notice Testing the low bit with `and(x, 1)` is cheaper than computing `x % 2`.
 contract RsgAsm10Bit {
     function odd(uint256 x) external pure returns (bool r) {
         assembly {

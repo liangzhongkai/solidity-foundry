@@ -10,6 +10,7 @@ contract RsgCross01Doc {
 
 // --- #2 receive / fallback vs explicit deposit() ---
 
+/// @notice Accepting plain ETH through `receive()` skips selector decoding and explicit function dispatch.
 contract RsgCross02Receive {
     uint256 public received;
 
@@ -52,6 +53,7 @@ contract RsgCross04OracleUncached {
     }
 }
 
+/// @notice Cache the oracle result locally so the contract pays for one external read instead of two.
 contract RsgCross04OracleCached {
     RsgCrossOracle public immutable o;
 
@@ -87,6 +89,7 @@ contract RsgCross05NoBatch {
     }
 }
 
+/// @notice Batch the work behind one external entrypoint so the caller avoids repeated cross-contract call overhead.
 contract RsgCross05Multicall {
     function run(address w) external {
         RsgCrossWorker(payable(w)).tickTwice();
@@ -118,6 +121,7 @@ contract RsgCross06RunnerSplit {
     }
 }
 
+/// @notice Keeping the related state updates in one contract avoids two external calls and their ABI overhead.
 contract RsgCross06Mono {
     uint256 public x;
     uint256 public y;

@@ -33,6 +33,7 @@ contract RsgBook02Uncached {
     }
 }
 
+/// @notice Cache `n` in the stack so the function avoids re-reading the same storage slot.
 contract RsgBook02Cached {
     uint256 private n;
 
@@ -55,6 +56,7 @@ contract RsgBook03Unpacked {
     }
 }
 
+/// @notice Place the two `uint128` values adjacent so they share one storage slot instead of two.
 contract RsgBook03Packed {
     uint128 public a = 1;
     uint128 public c = 3;
@@ -87,6 +89,7 @@ contract RsgBook04StructLoose {
     }
 }
 
+/// @notice Reorder struct fields so `x` and `z` pack together, reducing the slots touched per read.
 contract RsgBook04StructTight {
     Tight public s = Tight(1, 3, 2);
 
@@ -97,6 +100,7 @@ contract RsgBook04StructTight {
 
 // --- Book #5: short strings (<32 bytes) pack in one word ---
 
+/// @notice Short strings fit in Solidity's short-string storage layout, avoiding a separate data area read.
 contract RsgBook05ShortString {
     string public label = "short";
 
@@ -124,6 +128,7 @@ contract RsgBook06MutableRead {
     }
 }
 
+/// @notice `immutable` embeds the write-once value in code, avoiding a storage read on each call.
 contract RsgBook06ImmutableRead {
     uint256 public immutable factor;
 
@@ -157,6 +162,7 @@ contract RsgBook07ArrayLookup {
     }
 }
 
+/// @notice Membership is O(1): one keyed slot lookup instead of scanning the whole array.
 contract RsgBook07MappingLookup {
     mapping(uint256 => bool) public present;
 
@@ -192,6 +198,7 @@ contract RsgBook08LengthTwice {
     }
 }
 
+/// @notice Cache `arr.length` once so the loop does not pay for repeated storage length reads.
 contract RsgBook08LengthCached {
     uint256[] public arr;
 
@@ -233,6 +240,7 @@ contract RsgBook09ManyBools {
     }
 }
 
+/// @notice Pack many flags into one word so `setAll()` performs one `SSTORE` instead of many.
 contract RsgBook09Bitmap {
     uint256 private flags;
 
@@ -271,6 +279,7 @@ contract RsgBook11MemoryRoundtrip {
     }
 }
 
+/// @notice Mutate the struct in place so the function skips the storage-to-memory copy and write-back.
 contract RsgBook11StoragePtr {
     struct S {
         uint256 a;
@@ -300,6 +309,7 @@ contract RsgBook12Zeroing {
     }
 }
 
+/// @notice Keep a nonzero dust balance so a future refill can stay on the cheaper nonzero-to-nonzero path.
 contract RsgBook12Dust {
     uint256 public bal = 100;
 
@@ -318,6 +328,7 @@ contract RsgBook13Up {
     }
 }
 
+/// @notice Count down to zero so the loop condition is a simple `i > 0` check with no extra upper bound compare.
 contract RsgBook13Down {
     function sum(uint256 n) external pure returns (uint256 s) {
         unchecked {
@@ -338,6 +349,7 @@ contract RsgBook14WideTime {
     }
 }
 
+/// @notice A narrower timestamp type can pack with neighboring fields in real storage layouts.
 contract RsgBook14NarrowTime {
     uint64 public ts;
 

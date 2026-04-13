@@ -9,6 +9,7 @@ contract RsgOut01Public {
     }
 }
 
+/// @notice Historically `external` could avoid some wrapper overhead, though modern compilers often erase the gap.
 contract RsgOut01External {
     function f(uint256 x) external pure returns (uint256) {
         return x + 1;
@@ -23,6 +24,7 @@ contract RsgOut02GtZero {
     }
 }
 
+/// @notice Historical micro-optimization: `!= 0` sometimes compiled to a slightly cheaper unsigned zero check.
 contract RsgOut02NeZero {
     function nz(uint256 x) external pure returns (bool) {
         return x != 0;

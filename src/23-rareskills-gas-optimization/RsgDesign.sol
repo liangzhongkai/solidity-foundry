@@ -22,6 +22,8 @@ contract RsgDesign01MultiDelegate {
 
 // --- #2 merkle allowlist vs ECDSA allowlist (fixed-size demo) ---
 
+/// @notice A shared Merkle root lets each claimant prove inclusion with hashes instead of paying for signature recovery.
+/// @dev Whether this wins depends on proof depth, but short proofs often beat `ecrecover`-based checks.
 contract RsgDesign02Merkle {
     bytes32 public root;
 

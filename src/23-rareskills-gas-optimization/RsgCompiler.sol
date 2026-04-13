@@ -23,6 +23,7 @@ contract RsgSolc02CompoundRequire {
     }
 }
 
+/// @notice Splitting the checks lets the first failure short-circuit before evaluating the second predicate.
 contract RsgSolc02SplitRequire {
     function gate(uint256 a, uint256 b) external pure {
         require(a > 0);
@@ -39,6 +40,7 @@ contract RsgSolc03RevertJoin {
     }
 }
 
+/// @notice Keeping each revert branch separate can give the optimizer simpler control flow to lower.
 contract RsgSolc03RevertSplit {
     function fail(uint256 x) external pure {
         if (x == 1) {
@@ -59,6 +61,7 @@ contract RsgSolc04Unnamed {
     }
 }
 
+/// @notice Named returns can sometimes let Solidity reuse the return slot instead of building extra temporaries.
 contract RsgSolc04Named {
     function pick(uint256 x) external pure returns (uint256 r) {
         if (x > 5) {
@@ -78,6 +81,7 @@ contract RsgSolc05NegatedIf {
     }
 }
 
+/// @notice Writing the hot branch positively can compile to slightly simpler branching than negating the condition first.
 contract RsgSolc05PositiveIf {
     function route(bool c) external pure returns (uint256) {
         if (c) return 2;
@@ -95,6 +99,7 @@ contract RsgSolc06PostInc {
     }
 }
 
+/// @notice `++i` avoids the temporary value bookkeeping associated with post-increment.
 contract RsgSolc06PreInc {
     function run(uint256 n) external pure returns (uint256 s) {
         for (uint256 i; i < n; ++i) {
@@ -113,6 +118,7 @@ contract RsgSolc07CheckedSum {
     }
 }
 
+/// @notice Skipping overflow checks saves gas when the loop's value range is already known to be safe.
 contract RsgSolc07UncheckedSum {
     function sum(uint256[] calldata xs) external pure returns (uint256 s) {
         unchecked {
@@ -133,6 +139,7 @@ contract RsgSolc08LoopNaive {
     }
 }
 
+/// @notice Cache the length and use `++i` so the loop body does less repeated bookkeeping per iteration.
 contract RsgSolc08LoopOpt {
     function acc(uint256[] calldata xs) external pure returns (uint256 s) {
         uint256 len = xs.length;
@@ -152,6 +159,7 @@ contract RsgSolc09ForLoop {
     }
 }
 
+/// @notice Once the zero case is handled, the `do...while` loop can use a slightly leaner loop shape.
 contract RsgSolc09DoWhile {
     function sumTo(uint256 n) external pure returns (uint256 s) {
         uint256 i = 1;
@@ -171,6 +179,7 @@ contract RsgSolc10LooseTypes {
     }
 }
 
+/// @notice Full-word ABI arguments avoid the extra masking and widening that smaller integer types can trigger.
 contract RsgSolc10PackedArgs {
     function add(uint256 a, uint256 b) external pure returns (uint256) {
         return a + b;
@@ -194,6 +203,7 @@ contract RsgSolc11Hits {
     }
 }
 
+/// @notice Logical short-circuiting skips `b()` entirely once `a()` already returned true.
 contract RsgSolc11ShortCircuit {
     RsgSolc11Hits public immutable h;
 
@@ -230,6 +240,7 @@ contract RsgSolc12PublicVar {
     }
 }
 
+/// @notice A private variable avoids the compiler-generated public getter when callers only need the custom accessor.
 contract RsgSolc12PrivateGetter {
     uint256 private secret = 42;
 
@@ -246,6 +257,7 @@ contract RsgSolc15Mul {
     }
 }
 
+/// @notice Left shift by one is a direct bit operation that can be cheaper than generic multiplication.
 contract RsgSolc15Shift {
     function double(uint256 x) external pure returns (uint256) {
         return x << 1;
@@ -260,6 +272,7 @@ contract RsgSolc16CalldataTwice {
     }
 }
 
+/// @notice Cache the decoded byte once so the function does not index into calldata twice.
 contract RsgSolc16CalldataCache {
     function head2(bytes calldata d) external pure returns (uint256) {
         uint256 b0 = uint256(uint8(d[0]));
@@ -276,6 +289,7 @@ contract RsgSolc17Branchy {
     }
 }
 
+/// @notice The branchless form avoids jump-based control flow by computing the sign correction arithmetically.
 contract RsgSolc17Branchless {
     function abs(int256 x) external pure returns (int256 v) {
         int256 mask = x >> 255;
@@ -295,6 +309,7 @@ contract RsgSolc18Outlined {
     }
 }
 
+/// @notice Inlining a one-use helper can save the extra jump and stack shuffling for the call boundary.
 contract RsgSolc18Inlined {
     function entry(uint256 x) external pure returns (uint256) {
         return x + 1;
@@ -309,6 +324,7 @@ contract RsgSolc22Exp {
     }
 }
 
+/// @notice Repeated multiplication is cheaper here than the generic exponentiation path for a fixed exponent of three.
 contract RsgSolc22Mul {
     function cube(uint256 n) external pure returns (uint256) {
         return n * n * n;

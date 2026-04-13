@@ -24,6 +24,7 @@ contract RsgDep02NotPayable {
     constructor() {}
 }
 
+/// @notice A payable constructor omits the auto-generated `msg.value == 0` check from deployment bytecode.
 contract RsgDep02Payable {
     constructor() payable {}
 }
@@ -43,6 +44,7 @@ contract RsgDep05WithModifier {
     }
 }
 
+/// @notice Moving the guard into an internal helper can reduce bytecode duplication versus an inline modifier body.
 contract RsgDep05InternalGuard {
     uint256 private x;
 
@@ -78,6 +80,7 @@ contract RsgDep06Full {
     }
 }
 
+/// @notice Minimal proxies reuse implementation bytecode, so each new instance is much cheaper to deploy than a full copy.
 contract RsgDep06Clone {
     RsgDep06Impl public immutable child;
 
@@ -100,6 +103,7 @@ contract RsgDep07AdminNonPayable {
     }
 }
 
+/// @notice Making an admin-only function payable can remove Solidity's implicit zero-value check from the dispatcher.
 contract RsgDep07AdminPayable {
     uint256 private x;
 
@@ -118,6 +122,7 @@ contract RsgDep08RequireString {
     }
 }
 
+/// @notice Custom errors keep revert data tiny, which reduces both bytecode size and revert-path gas.
 contract RsgDep08CustomError {
     function gate(uint256 x) external pure {
         if (x == 0) revert RsgDepBad();
