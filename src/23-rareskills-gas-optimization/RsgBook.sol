@@ -193,7 +193,7 @@ contract RsgBook08LengthTwice {
     function sum() external view returns (uint256 s) {
         for (uint256 i; i < arr.length; i++) {
             s += arr[i];
-            s += arr.length; // second `.length` read each iteration (anti-pattern)
+            // s += arr.length; // second `.length` read each iteration (anti-pattern)
         }
     }
 }
