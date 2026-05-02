@@ -70,6 +70,11 @@ contract MockPoolManager {
     BalanceDelta public configuredModifyDelta;
     BalanceDelta public configuredFeesAccrued;
     BalanceDelta public configuredDonateDelta;
+    Currency public lastSyncedCurrency;
+    uint256 public syncCount;
+    bool internal hasSyncedCurrency;
+
+    error MissingSync();
 
     function setSwapDelta(BalanceDelta delta) external {
         configuredSwapDelta = delta;
@@ -117,13 +122,19 @@ contract MockPoolManager {
         return configuredDonateDelta;
     }
 
-    function sync(Currency) external {}
+    function sync(Currency currency) external {
+        lastSyncedCurrency = currency;
+        syncCount++;
+        hasSyncedCurrency = true;
+    }
 
     function take(Currency currency, address to, uint256 amount) external {
         MockERC20(Currency.unwrap(currency)).transfer(to, amount);
     }
 
     function settle() external payable returns (uint256 paid) {
+        if (msg.value == 0 && !hasSyncedCurrency) revert MissingSync();
+        hasSyncedCurrency = false;
         return 0;
     }
 
@@ -324,6 +335,8 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(amountOut, 5 ether);
         assertEq(dai.balanceOf(recipient), 5 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 2 ether);
+        assertEq(mockPoolManager.syncCount(), 1);
+        assertEq(Currency.unwrap(mockPoolManager.lastSyncedCurrency()), address(weth));
     }
 
     function testPoolManagerModifyLiquiditySettlesNegativeDeltas() public {
@@ -349,6 +362,8 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(feesAccrued.amount1(), 0.25 ether);
         assertEq(dai.balanceOf(address(mockPoolManager)), 3 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 1 ether);
+        assertEq(mockPoolManager.syncCount(), 2);
+        assertEq(Currency.unwrap(mockPoolManager.lastSyncedCurrency()), address(weth));
     }
 
     function testRouterSwapUsesPermit2ApprovalAndTransfersOutput() public {
