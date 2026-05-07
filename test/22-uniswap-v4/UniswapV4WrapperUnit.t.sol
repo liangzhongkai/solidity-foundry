@@ -436,13 +436,19 @@ contract UniswapV4WrapperUnitTest is Test {
 
         address attacker = makeAddr("attacker");
         vm.startPrank(attacker);
-        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionOwner.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV4PositionManagerExample.NotPositionOwner.selector, tokenId, attacker)
+        );
         positionExample.collectFees(tokenId, block.timestamp + 1 hours, attacker, bytes(""));
 
-        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionOwner.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV4PositionManagerExample.NotPositionOwner.selector, tokenId, attacker)
+        );
         positionExample.decreaseLiquidity(tokenId, 1, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
 
-        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionOwner.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV4PositionManagerExample.NotPositionOwner.selector, tokenId, attacker)
+        );
         positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
         vm.stopPrank();
     }

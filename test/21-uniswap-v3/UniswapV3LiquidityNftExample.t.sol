@@ -112,13 +112,19 @@ contract UniswapV3LiquidityNftExampleTest is Test {
         mockNpm.setLiquidity(tokenId, 10);
 
         vm.startPrank(attacker);
-        vm.expectRevert(UniswapV3LiquidityNftExample.NotPositionOwner.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityNftExample.NotPositionOwner.selector, tokenId, attacker)
+        );
         localExample.decreaseLiquidityAmount(tokenId, 1, 0, 0, block.timestamp + 1 hours);
 
-        vm.expectRevert(UniswapV3LiquidityNftExample.NotPositionOwner.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityNftExample.NotPositionOwner.selector, tokenId, attacker)
+        );
         localExample.collectFees(tokenId, attacker, type(uint128).max, type(uint128).max);
 
-        vm.expectRevert(UniswapV3LiquidityNftExample.NotPositionOwner.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityNftExample.NotPositionOwner.selector, tokenId, attacker)
+        );
         localExample.burnPositionFully(tokenId, 0, 0, block.timestamp + 1 hours);
         vm.stopPrank();
     }
