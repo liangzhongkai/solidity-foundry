@@ -67,7 +67,7 @@ contract MockV3PositionManager {
             uint128 tokensOwed1
         )
     {
-        return (0, address(0), address(0), address(0), 0, 0, 0, liquidities[tokenId], 0, 0, 0, 0);
+        liquidity = liquidities[tokenId];
     }
 }
 
