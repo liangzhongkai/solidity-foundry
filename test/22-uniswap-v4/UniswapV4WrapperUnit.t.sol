@@ -198,6 +198,7 @@ contract MockPositionManager is IPositionManager {
     mapping(uint256 => uint128) internal liquidities;
     mapping(uint256 => PoolKey) internal keys;
     mapping(uint256 => PositionInfo) internal infos;
+    mapping(uint256 tokenId => address owner) public ownerOf;
 
     function modifyLiquidities(bytes calldata unlockData, uint256) external payable {
         (bytes memory actions, bytes[] memory params) = abi.decode(unlockData, (bytes, bytes[]));
@@ -222,6 +223,7 @@ contract MockPositionManager is IPositionManager {
             liquidities[tokenId] = uint128(liquidity);
             keys[tokenId] = key;
             infos[tokenId] = _packPositionInfo(key, tickLower, tickUpper);
+            ownerOf[tokenId] = recipient;
             return;
         }
 
@@ -245,6 +247,7 @@ contract MockPositionManager is IPositionManager {
             (uint256 tokenId,,,) = abi.decode(params[0], (uint256, uint128, uint128, bytes));
             delete liquidities[tokenId];
             delete keys[tokenId];
+            delete ownerOf[tokenId];
             infos[tokenId] = PositionInfo.wrap(0);
         }
     }
@@ -416,6 +419,32 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(tokenId, 1);
         assertEq(positionExample.getPositionLiquidity(tokenId), 0);
         assertEq(permit2.lastSpender(), address(mockPositionManager));
+    }
+
+    function testPositionManagerRejectsNonOwnerForCustodialExit() public {
+        PoolKey memory key = _poolKey();
+        dai.mint(trader, 100 ether);
+        weth.mint(trader, 100 ether);
+
+        vm.startPrank(trader);
+        dai.approve(address(positionExample), type(uint256).max);
+        weth.approve(address(positionExample), type(uint256).max);
+        uint256 tokenId = positionExample.mintPosition(
+            key, -120, 120, 1e12, 10 ether, 10 ether, block.timestamp + 1 hours, address(positionExample), bytes("")
+        );
+        vm.stopPrank();
+
+        address attacker = makeAddr("attacker");
+        vm.startPrank(attacker);
+        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionOwner.selector);
+        positionExample.collectFees(tokenId, block.timestamp + 1 hours, attacker, bytes(""));
+
+        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionOwner.selector);
+        positionExample.decreaseLiquidity(tokenId, 1, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
+
+        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionOwner.selector);
+        positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
+        vm.stopPrank();
     }
 
     function _poolKey() internal view returns (PoolKey memory key) {

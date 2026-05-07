@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {IERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/IERC721.sol";
 import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 import {
@@ -43,6 +44,7 @@ contract UniswapV4PositionManagerExample {
 
     IPositionManager public immutable positionManager;
     IPermit2 public immutable permit2;
+    mapping(uint256 tokenId => address owner) public custodialPositionOwner;
 
     event Permit2Approval(address indexed token, uint160 amount, uint48 expiration);
     event PositionMinted(uint256 indexed tokenId, address indexed recipient, PoolId indexed poolId);
@@ -55,6 +57,7 @@ contract UniswapV4PositionManagerExample {
     error InvalidAmount();
     error InvalidRecipient();
     error NativeCurrencyNotSupported();
+    error NotPositionOwner(uint256 tokenId, address caller);
 
     constructor(address positionManager_, address permit2_) {
         if (positionManager_ == address(0) || permit2_ == address(0)) revert ZeroAddress();
@@ -206,6 +209,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) public {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionOwner(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeDecreaseLiquidityUnlockData(key, tokenId, liquidity, amount0Min, amount1Min, recipient, hookData),
@@ -231,10 +235,12 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) external {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionOwner(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeBurnPositionUnlockData(key, tokenId, amount0Min, amount1Min, recipient, hookData), deadline
         );
+        delete custodialPositionOwner[tokenId];
         emit PositionBurned(tokenId, recipient);
     }
 
@@ -289,9 +295,20 @@ contract UniswapV4PositionManagerExample {
             params.hookData
         );
         positionManager.modifyLiquidities(unlockData, params.deadline);
+        if (params.recipient == address(this)) {
+            custodialPositionOwner[tokenId] = msg.sender;
+        }
         _refundTokenDelta(token0, msg.sender, startBalance0);
         _refundTokenDelta(token1, msg.sender, startBalance1);
 
         emit PositionMinted(tokenId, params.recipient, key.toId());
+    }
+
+    function _requirePositionOwner(uint256 tokenId) internal view {
+        address owner = custodialPositionOwner[tokenId];
+        if (owner == address(0)) {
+            owner = IERC721(address(positionManager)).ownerOf(tokenId);
+        }
+        if (owner != msg.sender) revert NotPositionOwner(tokenId, msg.sender);
     }
 }
