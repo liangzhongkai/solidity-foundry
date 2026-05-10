@@ -281,9 +281,8 @@ contract UniswapV4PoolManagerExample is IUnlockCallback {
         }
 
         address token = Currency.unwrap(currency);
-        IERC20(token).safeTransferFrom(payer, address(this), amount);
-        IERC20(token).forceApprove(address(poolManager), amount);
-        IERC20(token).safeTransfer(address(poolManager), amount);
+        poolManager.sync(currency);
+        IERC20(token).safeTransferFrom(payer, address(poolManager), amount);
         poolManager.settle();
         return nativeRemaining;
     }

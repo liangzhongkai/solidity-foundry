@@ -64,12 +64,17 @@ contract MockUniversalRouter is IUniversalRouter {
 }
 
 contract MockPoolManager {
+    using CurrencyLibrary for Currency;
     using PoolIdLibrary for PoolKey;
 
     BalanceDelta public configuredSwapDelta;
     BalanceDelta public configuredModifyDelta;
     BalanceDelta public configuredFeesAccrued;
     BalanceDelta public configuredDonateDelta;
+    Currency public syncedCurrency;
+    Currency public lastSettledCurrency;
+    uint256 public syncCount;
+    uint256 public settleCount;
 
     function setSwapDelta(BalanceDelta delta) external {
         configuredSwapDelta = delta;
@@ -117,14 +122,21 @@ contract MockPoolManager {
         return configuredDonateDelta;
     }
 
-    function sync(Currency) external {}
+    function sync(Currency currency) external {
+        syncedCurrency = currency;
+        syncCount++;
+    }
 
     function take(Currency currency, address to, uint256 amount) external {
         MockERC20(Currency.unwrap(currency)).transfer(to, amount);
     }
 
     function settle() external payable returns (uint256 paid) {
-        return 0;
+        if (msg.value == 0 && syncedCurrency.isAddressZero()) revert("missing sync");
+        lastSettledCurrency = syncedCurrency;
+        settleCount++;
+        syncedCurrency = Currency.wrap(address(0));
+        return msg.value;
     }
 
     function settleFor(address) external payable returns (uint256 paid) {
@@ -324,6 +336,8 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(amountOut, 5 ether);
         assertEq(dai.balanceOf(recipient), 5 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 2 ether);
+        assertEq(mockPoolManager.syncCount(), 1);
+        assertEq(Currency.unwrap(mockPoolManager.lastSettledCurrency()), address(weth));
     }
 
     function testPoolManagerModifyLiquiditySettlesNegativeDeltas() public {
@@ -349,6 +363,8 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(feesAccrued.amount1(), 0.25 ether);
         assertEq(dai.balanceOf(address(mockPoolManager)), 3 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 1 ether);
+        assertEq(mockPoolManager.syncCount(), 2);
+        assertEq(mockPoolManager.settleCount(), 2);
     }
 
     function testRouterSwapUsesPermit2ApprovalAndTransfersOutput() public {
