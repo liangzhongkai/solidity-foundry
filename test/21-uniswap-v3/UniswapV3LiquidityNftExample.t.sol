@@ -94,7 +94,7 @@ contract MockV3PositionManager {
             uint128
         )
     {
-        liquidity = liquidities[tokenId];
+        return (0, address(0), address(0), address(0), 0, 0, 0, liquidities[tokenId], 0, 0, 0, 0);
     }
 
     function _requireApprovedForNpm(uint256 tokenId) internal view {
