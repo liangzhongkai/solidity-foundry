@@ -11,6 +11,7 @@ import {UniswapV4UniversalRouterExample} from "../../src/22-uniswap-v4/UniswapV4
 import {
     BalanceDelta,
     Currency,
+    CurrencyLibrary,
     IHooks,
     IPositionManager,
     IStateView,
