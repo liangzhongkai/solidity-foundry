@@ -176,8 +176,7 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
         (address initiator, address pool, uint256 amt0, uint256 amt1, address recipient) =
             abi.decode(data, (address, address, uint256, uint256, address));
         if (msg.sender != pool) revert NotPool();
-        (address token0, address token1) = _verifyPool(pool);
-        _repayFlashLoan(initiator, pool, token0, token1, amt0, amt1, fee0, fee1);
+        _repayFlashLoan(initiator, pool, amt0, amt1, fee0, fee1);
         emit FlashLoan(pool, initiator, recipient, amt0, amt1, fee0, fee1);
     }
 
@@ -185,21 +184,14 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external override {
         (address initiator, address pool, address recipient) = abi.decode(data, (address, address, address));
         if (msg.sender != pool) revert NotPool();
-        (address token0, address token1) = _verifyPool(pool);
-        _paySwapOwed(initiator, pool, token0, token1, amount0Delta, amount1Delta);
+        _paySwapOwed(initiator, pool, amount0Delta, amount1Delta);
         emit FlashSwap(pool, initiator, recipient, amount0Delta, amount1Delta);
     }
 
-    function _repayFlashLoan(
-        address initiator,
-        address pool,
-        address token0,
-        address token1,
-        uint256 amt0,
-        uint256 amt1,
-        uint256 fee0,
-        uint256 fee1
-    ) private {
+    function _repayFlashLoan(address initiator, address pool, uint256 amt0, uint256 amt1, uint256 fee0, uint256 fee1)
+        private
+    {
+        (address token0, address token1) = _verifyPool(pool);
         if (amt0 > 0) {
             uint256 pay0 = amt0 + fee0;
             IERC20(token0).safeTransferFrom(initiator, address(this), pay0);
@@ -212,14 +204,8 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
         }
     }
 
-    function _paySwapOwed(
-        address initiator,
-        address pool,
-        address token0,
-        address token1,
-        int256 amount0Delta,
-        int256 amount1Delta
-    ) private {
+    function _paySwapOwed(address initiator, address pool, int256 amount0Delta, int256 amount1Delta) private {
+        (address token0, address token1) = _verifyPool(pool);
         if (amount0Delta > 0) {
             IERC20(token0).safeTransferFrom(initiator, address(this), uint256(amount0Delta));
             IERC20(token0).safeTransfer(pool, uint256(amount0Delta));
