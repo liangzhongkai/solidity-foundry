@@ -134,6 +134,43 @@ contract UniswapV3LiquidityNftExampleTest is Test {
         vm.stopPrank();
     }
 
+    function testApprovedHelperDoesNotLetAttackerDrainPosition() public {
+        _skipIfNoNpm();
+        address lp = makeAddr("lp");
+        address attacker = makeAddr("attacker");
+        vm.deal(lp, 5 ether);
+        vm.startPrank(lp);
+        IWETH(WETH).deposit{value: 2 ether}();
+        deal(DAI, lp, 5_000 ether);
+        IERC20(WETH).approve(address(example), 2 ether);
+        IERC20(DAI).approve(address(example), 5_000 ether);
+
+        (int24 lower, int24 upper) = _symmetricTickWindow(WETH, DAI, FEE_030, 600);
+        uint256 tokenId = example.mintPosition(
+            WETH, DAI, FEE_030, lower, upper, 2 ether, 5_000 ether, 0, 0, block.timestamp + 1 hours
+        );
+        (,,,,,,, uint128 liq,,,,) = INonfungiblePositionManager(NPM).positions(tokenId);
+        IERC721(NPM).setApprovalForAll(address(example), true);
+        vm.stopPrank();
+
+        vm.startPrank(attacker);
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityNftExample.UnauthorizedPosition.selector, tokenId, attacker)
+        );
+        example.decreaseLiquidityAmount(tokenId, liq / 2, 0, 0, block.timestamp + 1 hours);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityNftExample.UnauthorizedPosition.selector, tokenId, attacker)
+        );
+        example.collectFees(tokenId, attacker, type(uint128).max, type(uint128).max);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityNftExample.UnauthorizedPosition.selector, tokenId, attacker)
+        );
+        example.burnPositionFully(tokenId, 0, 0, block.timestamp + 1 hours);
+        vm.stopPrank();
+    }
+
     /// @dev Full exit: decrease all, collect to LP, burn NFT — requires NPM approval for the helper contract.
     function testBurnPositionFullyDestroysPosition() public {
         _skipIfNoNpm();

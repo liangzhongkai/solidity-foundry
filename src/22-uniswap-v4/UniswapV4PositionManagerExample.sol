@@ -17,7 +17,8 @@ import {
 
 /// @title UniswapV4PositionManagerExample
 /// @notice Shows how to encode and execute the PositionManager's command-based liquidity actions.
-/// @dev This wrapper is intentionally custodial for the duration of a call: it pulls ERC20s into itself, forwards Permit2 approvals, and executes PosM actions.
+/// @dev This wrapper pulls ERC20s into itself for each call, forwards Permit2 approvals, and executes PosM actions.
+///      If the wrapper receives the position NFT, only the original minter can operate it through this contract.
 contract UniswapV4PositionManagerExample {
     using SafeERC20 for IERC20;
     using CurrencyLibrary for Currency;
@@ -43,6 +44,7 @@ contract UniswapV4PositionManagerExample {
 
     IPositionManager public immutable positionManager;
     IPermit2 public immutable permit2;
+    mapping(uint256 tokenId => address controller) public custodialPositionController;
 
     event Permit2Approval(address indexed token, uint160 amount, uint48 expiration);
     event PositionMinted(uint256 indexed tokenId, address indexed recipient, PoolId indexed poolId);
@@ -55,6 +57,7 @@ contract UniswapV4PositionManagerExample {
     error InvalidAmount();
     error InvalidRecipient();
     error NativeCurrencyNotSupported();
+    error UnauthorizedPosition(uint256 tokenId, address caller);
 
     constructor(address positionManager_, address permit2_) {
         if (positionManager_ == address(0) || permit2_ == address(0)) revert ZeroAddress();
@@ -179,6 +182,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) external {
         if (liquidity == 0) revert InvalidAmount();
+        _requirePositionAuthorized(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
 
         (address token0, address token1) = _pullPair(key, amount0Max, amount1Max);
@@ -206,6 +210,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) public {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionAuthorized(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeDecreaseLiquidityUnlockData(key, tokenId, liquidity, amount0Min, amount1Min, recipient, hookData),
@@ -231,10 +236,12 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) external {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionAuthorized(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeBurnPositionUnlockData(key, tokenId, amount0Min, amount1Min, recipient, hookData), deadline
         );
+        delete custodialPositionController[tokenId];
         emit PositionBurned(tokenId, recipient);
     }
 
@@ -289,9 +296,28 @@ contract UniswapV4PositionManagerExample {
             params.hookData
         );
         positionManager.modifyLiquidities(unlockData, params.deadline);
+        if (params.recipient == address(this)) {
+            custodialPositionController[tokenId] = msg.sender;
+        }
         _refundTokenDelta(token0, msg.sender, startBalance0);
         _refundTokenDelta(token1, msg.sender, startBalance1);
 
         emit PositionMinted(tokenId, params.recipient, key.toId());
+    }
+
+    function _requirePositionAuthorized(uint256 tokenId) internal view {
+        address controller = custodialPositionController[tokenId];
+        if (controller != address(0)) {
+            if (msg.sender != controller) revert UnauthorizedPosition(tokenId, msg.sender);
+            return;
+        }
+
+        address owner = positionManager.ownerOf(tokenId);
+        if (
+            msg.sender != owner && positionManager.getApproved(tokenId) != msg.sender
+                && !positionManager.isApprovedForAll(owner, msg.sender)
+        ) {
+            revert UnauthorizedPosition(tokenId, msg.sender);
+        }
     }
 }
