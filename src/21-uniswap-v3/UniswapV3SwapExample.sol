@@ -20,6 +20,20 @@ import {
 contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback {
     using SafeERC20 for IERC20;
 
+    struct FlashCallbackData {
+        address initiator;
+        address pool;
+        uint256 amt0;
+        uint256 amt1;
+        address recipient;
+    }
+
+    struct SwapCallbackData {
+        address initiator;
+        address pool;
+        address recipient;
+    }
+
     address public constant UNISWAP_V3_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
     address public constant SWAP_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
@@ -173,60 +187,59 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
 
     /// @inheritdoc IUniswapV3FlashCallback
     function uniswapV3FlashCallback(uint256 fee0, uint256 fee1, bytes calldata data) external override {
-        (address initiator, address pool, uint256 amt0, uint256 amt1, address recipient) =
-            abi.decode(data, (address, address, uint256, uint256, address));
-        if (msg.sender != pool) revert NotPool();
-        (address t0, address t1) = _requireCanonicalPool(pool);
-        _repayFlashLoan(initiator, pool, t0, t1, amt0, amt1, fee0, fee1);
-        emit FlashLoan(pool, initiator, recipient, amt0, amt1, fee0, fee1);
+        FlashCallbackData memory callbackData = abi.decode(data, (FlashCallbackData));
+        if (msg.sender != callbackData.pool) revert NotPool();
+        (address t0, address t1) = _requireCanonicalPool(callbackData.pool);
+        _repayFlashLoan(callbackData, t0, t1, fee0, fee1);
+        emit FlashLoan(
+            callbackData.pool,
+            callbackData.initiator,
+            callbackData.recipient,
+            callbackData.amt0,
+            callbackData.amt1,
+            fee0,
+            fee1
+        );
     }
 
     /// @inheritdoc IUniswapV3SwapCallback
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external override {
-        (address initiator, address pool, address recipient) = abi.decode(data, (address, address, address));
-        if (msg.sender != pool) revert NotPool();
-        (address t0, address t1) = _requireCanonicalPool(pool);
-        _paySwapOwed(initiator, pool, t0, t1, amount0Delta, amount1Delta);
-        emit FlashSwap(pool, initiator, recipient, amount0Delta, amount1Delta);
+        SwapCallbackData memory callbackData = abi.decode(data, (SwapCallbackData));
+        if (msg.sender != callbackData.pool) revert NotPool();
+        (address t0, address t1) = _requireCanonicalPool(callbackData.pool);
+        _paySwapOwed(callbackData, t0, t1, amount0Delta, amount1Delta);
+        emit FlashSwap(callbackData.pool, callbackData.initiator, callbackData.recipient, amount0Delta, amount1Delta);
     }
 
-    function _repayFlashLoan(
-        address initiator,
-        address pool,
-        address t0,
-        address t1,
-        uint256 amt0,
-        uint256 amt1,
-        uint256 fee0,
-        uint256 fee1
-    ) private {
-        if (amt0 > 0) {
-            uint256 pay0 = amt0 + fee0;
-            IERC20(t0).safeTransferFrom(initiator, address(this), pay0);
-            IERC20(t0).safeTransfer(pool, pay0);
+    function _repayFlashLoan(FlashCallbackData memory callbackData, address t0, address t1, uint256 fee0, uint256 fee1)
+        private
+    {
+        if (callbackData.amt0 > 0) {
+            uint256 pay0 = callbackData.amt0 + fee0;
+            IERC20(t0).safeTransferFrom(callbackData.initiator, address(this), pay0);
+            IERC20(t0).safeTransfer(callbackData.pool, pay0);
         }
-        if (amt1 > 0) {
-            uint256 pay1 = amt1 + fee1;
-            IERC20(t1).safeTransferFrom(initiator, address(this), pay1);
-            IERC20(t1).safeTransfer(pool, pay1);
+        if (callbackData.amt1 > 0) {
+            uint256 pay1 = callbackData.amt1 + fee1;
+            IERC20(t1).safeTransferFrom(callbackData.initiator, address(this), pay1);
+            IERC20(t1).safeTransfer(callbackData.pool, pay1);
         }
     }
 
     function _paySwapOwed(
-        address initiator,
-        address pool,
+        SwapCallbackData memory callbackData,
         address t0,
         address t1,
         int256 amount0Delta,
         int256 amount1Delta
     ) private {
         if (amount0Delta > 0) {
-            IERC20(t0).safeTransferFrom(initiator, address(this), uint256(amount0Delta));
-            IERC20(t0).safeTransfer(pool, uint256(amount0Delta));
+            IERC20(t0).safeTransferFrom(callbackData.initiator, address(this), uint256(amount0Delta));
+            IERC20(t0).safeTransfer(callbackData.pool, uint256(amount0Delta));
         }
         if (amount1Delta > 0) {
-            IERC20(t1).safeTransferFrom(initiator, address(this), uint256(amount1Delta));
-            IERC20(t1).safeTransfer(pool, uint256(amount1Delta));
+            IERC20(t1).safeTransferFrom(callbackData.initiator, address(this), uint256(amount1Delta));
+            IERC20(t1).safeTransfer(callbackData.pool, uint256(amount1Delta));
         }
     }
 
