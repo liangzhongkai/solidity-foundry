@@ -32,15 +32,13 @@ contract MaliciousV3Pool {
     }
 
     function spoofFlashCallback(address example, address victim, uint256 amount0, uint256 fee0) external {
-        UniswapV3SwapExample(example).uniswapV3FlashCallback(
-            fee0, 0, abi.encode(victim, address(this), amount0, uint256(0), address(this))
-        );
+        UniswapV3SwapExample(example)
+            .uniswapV3FlashCallback(fee0, 0, abi.encode(victim, address(this), amount0, uint256(0), address(this)));
     }
 
     function spoofSwapCallback(address example, address victim, int256 amount0Delta, int256 amount1Delta) external {
-        UniswapV3SwapExample(example).uniswapV3SwapCallback(
-            amount0Delta, amount1Delta, abi.encode(victim, address(this), address(this))
-        );
+        UniswapV3SwapExample(example)
+            .uniswapV3SwapCallback(amount0Delta, amount1Delta, abi.encode(victim, address(this), address(this)));
     }
 }
 
