@@ -5,6 +5,7 @@ import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 import {
+    IUniswapV3Factory,
     ISwapRouter,
     IUniswapV3Pool,
     IUniswapV3SwapCallback,
@@ -19,6 +20,7 @@ import {
 contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback {
     using SafeERC20 for IERC20;
 
+    address public constant UNISWAP_V3_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
     address public constant SWAP_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     /// @dev Uniswap V3 `TickMath.MIN_SQRT_RATIO + 1` (flash swap limit when swapping token0 -> token1).
@@ -174,7 +176,8 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
         (address initiator, address pool, uint256 amt0, uint256 amt1, address recipient) =
             abi.decode(data, (address, address, uint256, uint256, address));
         if (msg.sender != pool) revert NotPool();
-        _repayFlashLoan(initiator, pool, amt0, amt1, fee0, fee1);
+        (address t0, address t1) = _requireCanonicalPool(pool);
+        _repayFlashLoan(initiator, pool, t0, t1, amt0, amt1, fee0, fee1);
         emit FlashLoan(pool, initiator, recipient, amt0, amt1, fee0, fee1);
     }
 
@@ -182,15 +185,21 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external override {
         (address initiator, address pool, address recipient) = abi.decode(data, (address, address, address));
         if (msg.sender != pool) revert NotPool();
-        _paySwapOwed(initiator, pool, amount0Delta, amount1Delta);
+        (address t0, address t1) = _requireCanonicalPool(pool);
+        _paySwapOwed(initiator, pool, t0, t1, amount0Delta, amount1Delta);
         emit FlashSwap(pool, initiator, recipient, amount0Delta, amount1Delta);
     }
 
-    function _repayFlashLoan(address initiator, address pool, uint256 amt0, uint256 amt1, uint256 fee0, uint256 fee1)
-        private
-    {
-        address t0 = IUniswapV3Pool(pool).token0();
-        address t1 = IUniswapV3Pool(pool).token1();
+    function _repayFlashLoan(
+        address initiator,
+        address pool,
+        address t0,
+        address t1,
+        uint256 amt0,
+        uint256 amt1,
+        uint256 fee0,
+        uint256 fee1
+    ) private {
         if (amt0 > 0) {
             uint256 pay0 = amt0 + fee0;
             IERC20(t0).safeTransferFrom(initiator, address(this), pay0);
@@ -203,9 +212,14 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
         }
     }
 
-    function _paySwapOwed(address initiator, address pool, int256 amount0Delta, int256 amount1Delta) private {
-        address t0 = IUniswapV3Pool(pool).token0();
-        address t1 = IUniswapV3Pool(pool).token1();
+    function _paySwapOwed(
+        address initiator,
+        address pool,
+        address t0,
+        address t1,
+        int256 amount0Delta,
+        int256 amount1Delta
+    ) private {
         if (amount0Delta > 0) {
             IERC20(t0).safeTransferFrom(initiator, address(this), uint256(amount0Delta));
             IERC20(t0).safeTransfer(pool, uint256(amount0Delta));
@@ -214,6 +228,14 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
             IERC20(t1).safeTransferFrom(initiator, address(this), uint256(amount1Delta));
             IERC20(t1).safeTransfer(pool, uint256(amount1Delta));
         }
+    }
+
+    function _requireCanonicalPool(address pool) private view returns (address t0, address t1) {
+        t0 = IUniswapV3Pool(pool).token0();
+        t1 = IUniswapV3Pool(pool).token1();
+        uint24 poolFee = IUniswapV3Pool(pool).fee();
+        address canonicalPool = IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(t0, t1, poolFee);
+        if (canonicalPool != pool) revert NotPool();
     }
 
     function _pathFirstToken(bytes calldata path) private pure returns (address) {
