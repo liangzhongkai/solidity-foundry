@@ -27,6 +27,11 @@ contract UniswapV4PositionManagerExampleTest is UniswapV4Base {
         assertEq(info.tickUpper(), TICK_UPPER);
         assertGt(positionExample.getPositionLiquidity(tokenId), 0);
 
+        address attacker = makeAddr("attacker");
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionController.selector);
+        positionExample.decreaseLiquidity(tokenId, 1, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
+
         deal(DAI, funder, 100 ether);
         deal(WETH, funder, 100 ether);
         vm.startPrank(funder);
@@ -39,15 +44,18 @@ contract UniswapV4PositionManagerExampleTest is UniswapV4Base {
         assertGt(liquidityAfterIncrease, 0);
 
         address feeRecipient = makeAddr("fee-recipient");
+        vm.startPrank(funder);
         positionExample.collectFees(tokenId, block.timestamp + 1 hours, feeRecipient, bytes(""));
         positionExample.decreaseLiquidity(
             tokenId, liquidityAfterIncrease / 2, 0, 0, block.timestamp + 1 hours, feeRecipient, bytes("")
         );
+        vm.stopPrank();
 
         uint128 liquidityAfterDecrease = positionExample.getPositionLiquidity(tokenId);
         assertLt(liquidityAfterDecrease, liquidityAfterIncrease);
 
         address burnRecipient = makeAddr("burn-recipient");
+        vm.prank(funder);
         positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, burnRecipient, bytes(""));
         vm.expectRevert();
         positionExample.getPositionLiquidity(tokenId);
