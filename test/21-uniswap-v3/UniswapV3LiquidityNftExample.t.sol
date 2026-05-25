@@ -124,6 +124,18 @@ contract UniswapV3LiquidityNftExampleTest is Test {
         uint256 wethBefore = IERC20(WETH).balanceOf(lp);
 
         uint128 half = liq / 2;
+        address attacker = makeAddr("attacker");
+        vm.stopPrank();
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV3LiquidityNftExample.NotPositionOwner.selector);
+        example.decreaseLiquidityAmount(tokenId, half, 0, 0, block.timestamp + 1 hours);
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV3LiquidityNftExample.NotPositionOwner.selector);
+        example.collectFees(tokenId, attacker, type(uint128).max, type(uint128).max);
+
+        vm.startPrank(lp);
         example.decreaseLiquidityAmount(tokenId, half, 0, 0, block.timestamp + 1 hours);
         example.collectFees(tokenId, lp, type(uint128).max, type(uint128).max);
 
@@ -151,6 +163,14 @@ contract UniswapV3LiquidityNftExampleTest is Test {
         );
 
         IERC721(NPM).setApprovalForAll(address(example), true);
+        address attacker = makeAddr("attacker");
+        vm.stopPrank();
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV3LiquidityNftExample.NotPositionOwner.selector);
+        example.burnPositionFully(tokenId, 0, 0, block.timestamp + 1 hours);
+
+        vm.startPrank(lp);
         example.burnPositionFully(tokenId, 0, 0, block.timestamp + 1 hours);
         vm.stopPrank();
 

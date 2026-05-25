@@ -70,6 +70,9 @@ contract MockPoolManager {
     BalanceDelta public configuredModifyDelta;
     BalanceDelta public configuredFeesAccrued;
     BalanceDelta public configuredDonateDelta;
+    uint256 public syncCount;
+    uint256 public settleCount;
+    bool public syncCalledSinceSettle;
 
     function setSwapDelta(BalanceDelta delta) external {
         configuredSwapDelta = delta;
@@ -117,13 +120,21 @@ contract MockPoolManager {
         return configuredDonateDelta;
     }
 
-    function sync(Currency) external {}
+    function sync(Currency) external {
+        syncCalledSinceSettle = true;
+        syncCount++;
+    }
 
     function take(Currency currency, address to, uint256 amount) external {
         MockERC20(Currency.unwrap(currency)).transfer(to, amount);
     }
 
     function settle() external payable returns (uint256 paid) {
+        if (msg.value == 0) {
+            require(syncCalledSinceSettle, "sync required");
+            syncCalledSinceSettle = false;
+        }
+        settleCount++;
         return 0;
     }
 
@@ -198,6 +209,7 @@ contract MockPositionManager is IPositionManager {
     mapping(uint256 => uint128) internal liquidities;
     mapping(uint256 => PoolKey) internal keys;
     mapping(uint256 => PositionInfo) internal infos;
+    mapping(uint256 => address) internal owners;
 
     function modifyLiquidities(bytes calldata unlockData, uint256) external payable {
         (bytes memory actions, bytes[] memory params) = abi.decode(unlockData, (bytes, bytes[]));
@@ -222,6 +234,7 @@ contract MockPositionManager is IPositionManager {
             liquidities[tokenId] = uint128(liquidity);
             keys[tokenId] = key;
             infos[tokenId] = _packPositionInfo(key, tickLower, tickUpper);
+            owners[tokenId] = recipient;
             return;
         }
 
@@ -246,6 +259,7 @@ contract MockPositionManager is IPositionManager {
             delete liquidities[tokenId];
             delete keys[tokenId];
             infos[tokenId] = PositionInfo.wrap(0);
+            delete owners[tokenId];
         }
     }
 
@@ -261,6 +275,12 @@ contract MockPositionManager is IPositionManager {
 
     function positionInfo(uint256 tokenId) external view returns (PositionInfo) {
         return infos[tokenId];
+    }
+
+    function ownerOf(uint256 tokenId) external view returns (address) {
+        address owner = owners[tokenId];
+        require(owner != address(0), "not minted");
+        return owner;
     }
 
     function _packPositionInfo(PoolKey memory key, int24 tickLower, int24 tickUpper)
@@ -324,6 +344,8 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(amountOut, 5 ether);
         assertEq(dai.balanceOf(recipient), 5 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 2 ether);
+        assertEq(mockPoolManager.syncCount(), 1);
+        assertEq(mockPoolManager.settleCount(), 1);
     }
 
     function testPoolManagerModifyLiquiditySettlesNegativeDeltas() public {
@@ -349,6 +371,8 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(feesAccrued.amount1(), 0.25 ether);
         assertEq(dai.balanceOf(address(mockPoolManager)), 3 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 1 ether);
+        assertEq(mockPoolManager.syncCount(), 2);
+        assertEq(mockPoolManager.settleCount(), 2);
     }
 
     function testRouterSwapUsesPermit2ApprovalAndTransfersOutput() public {
@@ -408,6 +432,22 @@ contract UniswapV4WrapperUnitTest is Test {
         uint256 tokenId = positionExample.mintPosition(
             key, -120, 120, 1e12, 10 ether, 10 ether, block.timestamp + 1 hours, address(positionExample), bytes("")
         );
+        vm.stopPrank();
+
+        address attacker = makeAddr("attacker");
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionController.selector);
+        positionExample.decreaseLiquidity(tokenId, 1, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionController.selector);
+        positionExample.collectFees(tokenId, block.timestamp + 1 hours, attacker, bytes(""));
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionController.selector);
+        positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
+
+        vm.startPrank(trader);
         positionExample.increaseLiquidity(tokenId, 5e11, 5 ether, 5 ether, block.timestamp + 1 hours, bytes(""));
         positionExample.decreaseLiquidity(tokenId, 5e11, 0, 0, block.timestamp + 1 hours, recipient, bytes(""));
         positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, recipient, bytes(""));
