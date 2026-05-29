@@ -198,6 +198,9 @@ contract MockPositionManager is IPositionManager {
     mapping(uint256 => uint128) internal liquidities;
     mapping(uint256 => PoolKey) internal keys;
     mapping(uint256 => PositionInfo) internal infos;
+    mapping(uint256 => address) internal owners;
+    mapping(uint256 => address) internal tokenApprovals;
+    mapping(address => mapping(address => bool)) internal operatorApprovals;
 
     function modifyLiquidities(bytes calldata unlockData, uint256) external payable {
         (bytes memory actions, bytes[] memory params) = abi.decode(unlockData, (bytes, bytes[]));
@@ -222,6 +225,7 @@ contract MockPositionManager is IPositionManager {
             liquidities[tokenId] = uint128(liquidity);
             keys[tokenId] = key;
             infos[tokenId] = _packPositionInfo(key, tickLower, tickUpper);
+            owners[tokenId] = recipient;
             return;
         }
 
@@ -246,6 +250,8 @@ contract MockPositionManager is IPositionManager {
             delete liquidities[tokenId];
             delete keys[tokenId];
             infos[tokenId] = PositionInfo.wrap(0);
+            delete owners[tokenId];
+            delete tokenApprovals[tokenId];
         }
     }
 
@@ -261,6 +267,29 @@ contract MockPositionManager is IPositionManager {
 
     function positionInfo(uint256 tokenId) external view returns (PositionInfo) {
         return infos[tokenId];
+    }
+
+    function ownerOf(uint256 tokenId) external view returns (address owner) {
+        owner = owners[tokenId];
+        require(owner != address(0), "NOT_MINTED");
+    }
+
+    function getApproved(uint256 tokenId) external view returns (address operator) {
+        require(owners[tokenId] != address(0), "NOT_MINTED");
+        return tokenApprovals[tokenId];
+    }
+
+    function isApprovedForAll(address owner, address operator) external view returns (bool) {
+        return operatorApprovals[owner][operator];
+    }
+
+    function approve(address operator, uint256 tokenId) external {
+        require(msg.sender == owners[tokenId], "NOT_OWNER");
+        tokenApprovals[tokenId] = operator;
+    }
+
+    function setApprovalForAll(address operator, bool approved) external {
+        operatorApprovals[msg.sender][operator] = approved;
     }
 
     function _packPositionInfo(PoolKey memory key, int24 tickLower, int24 tickUpper)
@@ -416,6 +445,40 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(tokenId, 1);
         assertEq(positionExample.getPositionLiquidity(tokenId), 0);
         assertEq(permit2.lastSpender(), address(mockPositionManager));
+    }
+
+    function testPositionManagerCustodialPositionRejectsUnauthorizedExit() public {
+        PoolKey memory key = _poolKey();
+        dai.mint(trader, 100 ether);
+        weth.mint(trader, 100 ether);
+
+        vm.startPrank(trader);
+        dai.approve(address(positionExample), type(uint256).max);
+        weth.approve(address(positionExample), type(uint256).max);
+        uint256 tokenId = positionExample.mintPosition(
+            key, -120, 120, 1e12, 10 ether, 10 ether, block.timestamp + 1 hours, address(positionExample), bytes("")
+        );
+        vm.stopPrank();
+
+        assertEq(positionExample.custodialPositionOwner(tokenId), trader);
+
+        address attacker = makeAddr("attacker");
+        bytes memory unauthorized = abi.encodeWithSelector(
+            UniswapV4PositionManagerExample.UnauthorizedPositionCaller.selector, tokenId, attacker
+        );
+
+        vm.startPrank(attacker);
+        vm.expectRevert(unauthorized);
+        positionExample.collectFees(tokenId, block.timestamp + 1 hours, attacker, bytes(""));
+        vm.expectRevert(unauthorized);
+        positionExample.decreaseLiquidity(tokenId, 1, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
+        vm.expectRevert(unauthorized);
+        positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
+        vm.stopPrank();
+
+        vm.prank(trader);
+        positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, trader, bytes(""));
+        assertEq(positionExample.custodialPositionOwner(tokenId), address(0));
     }
 
     function _poolKey() internal view returns (PoolKey memory key) {
