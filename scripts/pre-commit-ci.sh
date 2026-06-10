@@ -22,6 +22,8 @@ if command -v manticore-verifier &>/dev/null; then
   echo "[5/6] Manticore..."
   manticore-verifier src/manticore/CounterManticore.sol \
     --contract_name CounterManticore \
+    --compile-force-framework foundry \
+    --maxt 2 \
     --timeout 120 || echo "Manticore execution failed, skipping..."
 else
   echo "[5/6] Skipping Manticore (manticore-verifier not in PATH)"

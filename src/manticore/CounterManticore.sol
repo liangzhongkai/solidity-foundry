@@ -1,15 +1,33 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {Counter} from "../Counter.sol";
+/// @notice Minimal counter for Manticore; avoids forge-std console.log opcodes.
+contract ManticoreCounter {
+    uint256 public number;
+
+    function setNumber(uint256 newNumber) public {
+        number = newNumber;
+    }
+
+    function increment() public {
+        number++;
+    }
+
+    function decrement() public {
+        if (number == 0) {
+            revert("number cannot go below zero");
+        }
+        number--;
+    }
+}
 
 /// @notice Manticore 符号执行测试合约 - 使用 crytic_* 前缀定义属性
 /// manticore-verifier 会验证这些属性在符号执行下始终成立
 contract CounterManticore {
-    Counter public counter;
+    ManticoreCounter public counter;
 
     constructor() {
-        counter = new Counter();
+        counter = new ManticoreCounter();
     }
 
     function increment() public {

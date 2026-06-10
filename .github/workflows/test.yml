@@ -46,9 +46,14 @@ jobs:
         run: forge build --sizes --build-info
 
       - name: Run Forge tests
+        run: forge test -vvv --ffi
+
+      - name: Generate gas report
         run: |
           set -o pipefail
-          forge test -vvv --ffi --gas-report | tee gas-report.txt
+          forge test --gas-report \
+            --no-match-path test/23-rareskills-gas-optimization/RareSkillsGasOptimization.t.sol \
+            | tee gas-report.txt
 
       - name: Upload gas report
         uses: actions/upload-artifact@v4
@@ -91,16 +96,14 @@ jobs:
 
       - name: Run Manticore verifier
         run: |
-          forge build --sizes
+          forge build --build-info --sizes
           python -m venv .manticore-venv
           . .manticore-venv/bin/activate
           python -m pip install --upgrade pip
           pip install "protobuf>=3.19.0,<4"  # Manticore _pb2.py incompatible with protobuf 4.21+
-          pip install "solc-select"
-          solc-select install 0.8.20
-          solc-select use 0.8.20
           pip install "manticore==0.3.7"
           manticore-verifier src/manticore/CounterManticore.sol \
             --contract_name CounterManticore \
-            --config-file crytic_compile.config.json \
-            --timeout 300
+            --compile-force-framework foundry \
+            --maxt 2 \
+            --timeout 600
