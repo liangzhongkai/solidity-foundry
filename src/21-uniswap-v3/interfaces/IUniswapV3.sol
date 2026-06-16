@@ -115,6 +115,12 @@ interface INonfungiblePositionManager {
 
     function factory() external view returns (address);
 
+    function ownerOf(uint256 tokenId) external view returns (address owner);
+
+    function getApproved(uint256 tokenId) external view returns (address operator);
+
+    function isApprovedForAll(address owner, address operator) external view returns (bool);
+
     function mint(MintParams calldata params)
         external
         payable

@@ -200,6 +200,12 @@ interface IPositionManager {
 
     function modifyLiquiditiesWithoutUnlock(bytes calldata actions, bytes[] calldata params) external payable;
 
+    function ownerOf(uint256 tokenId) external view returns (address owner);
+
+    function getApproved(uint256 tokenId) external view returns (address operator);
+
+    function isApprovedForAll(address owner, address operator) external view returns (bool);
+
     function nextTokenId() external view returns (uint256);
 
     function getPositionLiquidity(uint256 tokenId) external view returns (uint128 liquidity);
