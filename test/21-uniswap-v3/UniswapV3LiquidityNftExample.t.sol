@@ -16,6 +16,61 @@ interface IWETH {
     function deposit() external payable;
 }
 
+contract MockV3PositionManager {
+    mapping(uint256 tokenId => address owner) public ownerOf;
+    mapping(uint256 tokenId => uint128 liquidity) public liquidities;
+
+    function setOwner(uint256 tokenId, address owner) external {
+        ownerOf[tokenId] = owner;
+    }
+
+    function setLiquidity(uint256 tokenId, uint128 liquidity) external {
+        liquidities[tokenId] = liquidity;
+    }
+
+    function decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams calldata params)
+        external
+        returns (uint256 amount0, uint256 amount1)
+    {
+        liquidities[params.tokenId] -= params.liquidity;
+        return (1, 1);
+    }
+
+    function collect(INonfungiblePositionManager.CollectParams calldata)
+        external
+        pure
+        returns (uint256 amount0, uint256 amount1)
+    {
+        return (1, 1);
+    }
+
+    function burn(uint256 tokenId) external {
+        delete ownerOf[tokenId];
+        delete liquidities[tokenId];
+    }
+
+    function positions(uint256 tokenId)
+        external
+        view
+        returns (
+            uint96 nonce,
+            address operator,
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity,
+            uint256 feeGrowthInside0LastX128,
+            uint256 feeGrowthInside1LastX128,
+            uint128 tokensOwed0,
+            uint128 tokensOwed1
+        )
+    {
+        liquidity = liquidities[tokenId];
+    }
+}
+
 /// @notice Tick math (no fork) plus fork flows for mint / decrease / collect / burn.
 contract UniswapV3LiquidityNftExampleTest is Test {
     address internal constant NPM = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
@@ -44,6 +99,34 @@ contract UniswapV3LiquidityNftExampleTest is Test {
     function testFloorTickToSpacingHandlesNegativeTicks() public view {
         assertEq(example.floorTickToSpacing(-55, 60), -60);
         assertEq(example.floorTickToSpacing(65, 60), 60);
+    }
+
+    function testApprovedHelperRejectsNonOwnerManagementCalls() public {
+        MockV3PositionManager mockNpm = new MockV3PositionManager();
+        UniswapV3LiquidityNftExample localExample = new UniswapV3LiquidityNftExample(address(mockNpm));
+        uint256 tokenId = 1;
+        address lp = makeAddr("lp");
+        address attacker = makeAddr("attacker");
+
+        mockNpm.setOwner(tokenId, lp);
+        mockNpm.setLiquidity(tokenId, 10);
+
+        vm.startPrank(attacker);
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityNftExample.NotPositionOwner.selector, tokenId, attacker)
+        );
+        localExample.decreaseLiquidityAmount(tokenId, 1, 0, 0, block.timestamp + 1 hours);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityNftExample.NotPositionOwner.selector, tokenId, attacker)
+        );
+        localExample.collectFees(tokenId, attacker, type(uint128).max, type(uint128).max);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV3LiquidityNftExample.NotPositionOwner.selector, tokenId, attacker)
+        );
+        localExample.burnPositionFully(tokenId, 0, 0, block.timestamp + 1 hours);
+        vm.stopPrank();
     }
 
     /// @dev Mint sends the NFT to `msg.sender`; asymmetric deposits are normal when price sits inside the range.

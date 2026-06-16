@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {IERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/IERC721.sol";
 import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 import {INonfungiblePositionManager} from "./interfaces/IUniswapV3.sol";
@@ -23,6 +24,7 @@ contract UniswapV3LiquidityNftExample {
 
     error ZeroAddress();
     error UnsupportedFeeTier();
+    error NotPositionOwner(uint256 tokenId, address caller);
 
     constructor(address positionManager_) {
         if (positionManager_ == address(0)) revert ZeroAddress();
@@ -98,6 +100,8 @@ contract UniswapV3LiquidityNftExample {
         uint256 amount1Min,
         uint256 deadline
     ) external returns (uint256 amount0, uint256 amount1) {
+        _requirePositionOwner(tokenId);
+
         INonfungiblePositionManager.DecreaseLiquidityParams memory params =
             INonfungiblePositionManager.DecreaseLiquidityParams({
                 tokenId: tokenId,
@@ -118,6 +122,7 @@ contract UniswapV3LiquidityNftExample {
         returns (uint256 amount0, uint256 amount1)
     {
         if (recipient == address(0)) revert ZeroAddress();
+        _requirePositionOwner(tokenId);
 
         INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager.CollectParams({
             tokenId: tokenId, recipient: recipient, amount0Max: amount0Max, amount1Max: amount1Max
@@ -135,6 +140,8 @@ contract UniswapV3LiquidityNftExample {
         uint256 amount1MinDecrease,
         uint256 deadline
     ) external {
+        _requirePositionOwner(tokenId);
+
         // slither-disable-next-line unused-return -- only `liquidity` is needed for the burn sequence
         (,,,,,,, uint128 liq,,,,) = positionManager.positions(tokenId);
         if (liq > 0) {
@@ -160,6 +167,12 @@ contract UniswapV3LiquidityNftExample {
 
         positionManager.burn(tokenId);
         emit PositionBurned(tokenId);
+    }
+
+    function _requirePositionOwner(uint256 tokenId) internal view {
+        if (IERC721(address(positionManager)).ownerOf(tokenId) != msg.sender) {
+            revert NotPositionOwner(tokenId, msg.sender);
+        }
     }
 
     function _pullAndApprove(address token0, address token1, uint256 amount0Desired, uint256 amount1Desired) internal {
