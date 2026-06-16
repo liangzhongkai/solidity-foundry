@@ -3,12 +3,43 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {ERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/ERC20.sol";
 
 import {IUniswapV3Factory, IUniswapV3Pool} from "../../src/21-uniswap-v3/interfaces/IUniswapV3.sol";
 import {UniswapV3SwapExample} from "../../src/21-uniswap-v3/UniswapV3SwapExample.sol";
 
 interface IWETH {
     function deposit() external payable;
+}
+
+contract MockCallbackToken is ERC20 {
+    constructor() ERC20("Mock Callback Token", "MCT") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
+
+contract MaliciousV3Pool {
+    address public immutable token0;
+    address public immutable token1;
+    uint24 public immutable fee;
+
+    constructor(address token0_, address token1_, uint24 fee_) {
+        token0 = token0_;
+        token1 = token1_;
+        fee = fee_;
+    }
+
+    function spoofFlashCallback(address example, address victim, uint256 amount0, uint256 fee0) external {
+        UniswapV3SwapExample(example)
+            .uniswapV3FlashCallback(fee0, 0, abi.encode(victim, address(this), amount0, uint256(0), address(this)));
+    }
+
+    function spoofSwapCallback(address example, address victim, int256 amount0Delta, int256 amount1Delta) external {
+        UniswapV3SwapExample(example)
+            .uniswapV3SwapCallback(amount0Delta, amount1Delta, abi.encode(victim, address(this), address(this)));
+    }
 }
 
 /// @notice Fork tests for single- and multi-hop `SwapRouter` flows.
@@ -191,6 +222,53 @@ contract UniswapV3SwapExampleTest is Test {
     function testFlashLoanRevertsZeroRecipient() public {
         vm.expectRevert(UniswapV3SwapExample.ZeroAddress.selector);
         example.flashLoan(makeAddr("pool"), address(0), 1, 0);
+    }
+
+    function testFlashCallbackRejectsSpoofedPoolBeforeMovingVictimAllowance() public {
+        MockCallbackToken token = new MockCallbackToken();
+        MaliciousV3Pool maliciousPool = new MaliciousV3Pool(address(token), WETH, FEE_030);
+        address victim = makeAddr("flashCallbackVictim");
+        uint256 victimBalance = 100 ether;
+        uint256 amount = 10 ether;
+        uint256 callbackFee = 1 ether;
+
+        token.mint(victim, victimBalance);
+        vm.prank(victim);
+        token.approve(address(example), type(uint256).max);
+        vm.mockCall(
+            FACTORY,
+            abi.encodeWithSelector(IUniswapV3Factory.getPool.selector, address(token), WETH, FEE_030),
+            abi.encode(makeAddr("canonicalPool"))
+        );
+
+        vm.expectRevert(UniswapV3SwapExample.NotPool.selector);
+        maliciousPool.spoofFlashCallback(address(example), victim, amount, callbackFee);
+
+        assertEq(token.balanceOf(victim), victimBalance);
+        assertEq(token.balanceOf(address(maliciousPool)), 0);
+    }
+
+    function testSwapCallbackRejectsSpoofedPoolBeforeMovingVictimAllowance() public {
+        MockCallbackToken token = new MockCallbackToken();
+        MaliciousV3Pool maliciousPool = new MaliciousV3Pool(address(token), WETH, FEE_030);
+        address victim = makeAddr("swapCallbackVictim");
+        uint256 victimBalance = 100 ether;
+        uint256 amountOwed = 10 ether;
+
+        token.mint(victim, victimBalance);
+        vm.prank(victim);
+        token.approve(address(example), type(uint256).max);
+        vm.mockCall(
+            FACTORY,
+            abi.encodeWithSelector(IUniswapV3Factory.getPool.selector, address(token), WETH, FEE_030),
+            abi.encode(makeAddr("canonicalPool"))
+        );
+
+        vm.expectRevert(UniswapV3SwapExample.NotPool.selector);
+        maliciousPool.spoofSwapCallback(address(example), victim, int256(amountOwed), 0);
+
+        assertEq(token.balanceOf(victim), victimBalance);
+        assertEq(token.balanceOf(address(maliciousPool)), 0);
     }
 
     function testFlashSwapRevertsZeroAmount() public {
