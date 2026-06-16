@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {IERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/IERC721.sol";
 import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 import {INonfungiblePositionManager} from "./interfaces/IUniswapV3.sol";
@@ -23,6 +24,7 @@ contract UniswapV3LiquidityNftExample {
 
     error ZeroAddress();
     error UnsupportedFeeTier();
+    error UnauthorizedPositionOperator();
 
     constructor(address positionManager_) {
         if (positionManager_ == address(0)) revert ZeroAddress();
@@ -98,6 +100,8 @@ contract UniswapV3LiquidityNftExample {
         uint256 amount1Min,
         uint256 deadline
     ) external returns (uint256 amount0, uint256 amount1) {
+        _requirePositionOperator(tokenId);
+
         INonfungiblePositionManager.DecreaseLiquidityParams memory params =
             INonfungiblePositionManager.DecreaseLiquidityParams({
                 tokenId: tokenId,
@@ -118,6 +122,7 @@ contract UniswapV3LiquidityNftExample {
         returns (uint256 amount0, uint256 amount1)
     {
         if (recipient == address(0)) revert ZeroAddress();
+        _requirePositionOperator(tokenId);
 
         INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager.CollectParams({
             tokenId: tokenId, recipient: recipient, amount0Max: amount0Max, amount1Max: amount1Max
@@ -135,6 +140,8 @@ contract UniswapV3LiquidityNftExample {
         uint256 amount1MinDecrease,
         uint256 deadline
     ) external {
+        _requirePositionOperator(tokenId);
+
         // slither-disable-next-line unused-return -- only `liquidity` is needed for the burn sequence
         (,,,,,,, uint128 liq,,,,) = positionManager.positions(tokenId);
         if (liq > 0) {
@@ -167,6 +174,14 @@ contract UniswapV3LiquidityNftExample {
         IERC20(token1).safeTransferFrom(msg.sender, address(this), amount1Desired);
         IERC20(token0).forceApprove(address(positionManager), amount0Desired);
         IERC20(token1).forceApprove(address(positionManager), amount1Desired);
+    }
+
+    function _requirePositionOperator(uint256 tokenId) internal view {
+        IERC721 nft = IERC721(address(positionManager));
+        address owner = nft.ownerOf(tokenId);
+        if (msg.sender != owner && nft.getApproved(tokenId) != msg.sender && !nft.isApprovedForAll(owner, msg.sender)) {
+            revert UnauthorizedPositionOperator();
+        }
     }
 
     function _resolveTokensAndAmounts(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired)

@@ -5,6 +5,7 @@ import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 import {
+    IUniswapV3Factory,
     ISwapRouter,
     IUniswapV3Pool,
     IUniswapV3SwapCallback,
@@ -20,6 +21,7 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
     using SafeERC20 for IERC20;
 
     address public constant SWAP_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
+    address public constant UNISWAP_V3_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
 
     /// @dev Uniswap V3 `TickMath.MIN_SQRT_RATIO + 1` (flash swap limit when swapping token0 -> token1).
     uint160 internal constant MIN_SQRT_RATIO_PLUS_ONE = 4_295_128_740;
@@ -189,31 +191,37 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
     function _repayFlashLoan(address initiator, address pool, uint256 amt0, uint256 amt1, uint256 fee0, uint256 fee1)
         private
     {
-        address t0 = IUniswapV3Pool(pool).token0();
-        address t1 = IUniswapV3Pool(pool).token1();
+        (address token0, address token1) = _verifyPool(pool);
         if (amt0 > 0) {
             uint256 pay0 = amt0 + fee0;
-            IERC20(t0).safeTransferFrom(initiator, address(this), pay0);
-            IERC20(t0).safeTransfer(pool, pay0);
+            IERC20(token0).safeTransferFrom(initiator, address(this), pay0);
+            IERC20(token0).safeTransfer(pool, pay0);
         }
         if (amt1 > 0) {
             uint256 pay1 = amt1 + fee1;
-            IERC20(t1).safeTransferFrom(initiator, address(this), pay1);
-            IERC20(t1).safeTransfer(pool, pay1);
+            IERC20(token1).safeTransferFrom(initiator, address(this), pay1);
+            IERC20(token1).safeTransfer(pool, pay1);
         }
     }
 
     function _paySwapOwed(address initiator, address pool, int256 amount0Delta, int256 amount1Delta) private {
-        address t0 = IUniswapV3Pool(pool).token0();
-        address t1 = IUniswapV3Pool(pool).token1();
+        (address token0, address token1) = _verifyPool(pool);
         if (amount0Delta > 0) {
-            IERC20(t0).safeTransferFrom(initiator, address(this), uint256(amount0Delta));
-            IERC20(t0).safeTransfer(pool, uint256(amount0Delta));
+            IERC20(token0).safeTransferFrom(initiator, address(this), uint256(amount0Delta));
+            IERC20(token0).safeTransfer(pool, uint256(amount0Delta));
         }
         if (amount1Delta > 0) {
-            IERC20(t1).safeTransferFrom(initiator, address(this), uint256(amount1Delta));
-            IERC20(t1).safeTransfer(pool, uint256(amount1Delta));
+            IERC20(token1).safeTransferFrom(initiator, address(this), uint256(amount1Delta));
+            IERC20(token1).safeTransfer(pool, uint256(amount1Delta));
         }
+    }
+
+    function _verifyPool(address pool) private view returns (address token0, address token1) {
+        IUniswapV3Pool v3Pool = IUniswapV3Pool(pool);
+        token0 = v3Pool.token0();
+        token1 = v3Pool.token1();
+        uint24 fee = v3Pool.fee();
+        if (IUniswapV3Factory(UNISWAP_V3_FACTORY).getPool(token0, token1, fee) != pool) revert NotPool();
     }
 
     function _pathFirstToken(bytes calldata path) private pure returns (address) {

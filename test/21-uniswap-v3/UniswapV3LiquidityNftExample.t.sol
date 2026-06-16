@@ -16,6 +16,107 @@ interface IWETH {
     function deposit() external payable;
 }
 
+contract MockV3PositionManager {
+    mapping(uint256 => address) internal owners;
+    mapping(uint256 => address) internal tokenApprovals;
+    mapping(address => mapping(address => bool)) internal operatorApprovals;
+    mapping(uint256 => uint128) internal liquidities;
+
+    address public lastCollectRecipient;
+
+    function mintMock(address owner, uint256 tokenId, uint128 liquidity) external {
+        owners[tokenId] = owner;
+        liquidities[tokenId] = liquidity;
+    }
+
+    function ownerOf(uint256 tokenId) external view returns (address owner) {
+        owner = owners[tokenId];
+        require(owner != address(0), "missing owner");
+    }
+
+    function getApproved(uint256 tokenId) external view returns (address operator) {
+        require(owners[tokenId] != address(0), "missing owner");
+        return tokenApprovals[tokenId];
+    }
+
+    function isApprovedForAll(address owner, address operator) external view returns (bool) {
+        return operatorApprovals[owner][operator];
+    }
+
+    function approve(address operator, uint256 tokenId) external {
+        require(msg.sender == owners[tokenId], "not owner");
+        tokenApprovals[tokenId] = operator;
+    }
+
+    function setApprovalForAll(address operator, bool approved) external {
+        operatorApprovals[msg.sender][operator] = approved;
+    }
+
+    function decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams calldata params)
+        external
+        view
+        returns (uint256 amount0, uint256 amount1)
+    {
+        _requireApprovedForNpm(params.tokenId);
+        return (7, 11);
+    }
+
+    function collect(INonfungiblePositionManager.CollectParams calldata params)
+        external
+        returns (uint256 amount0, uint256 amount1)
+    {
+        _requireApprovedForNpm(params.tokenId);
+        lastCollectRecipient = params.recipient;
+        return (params.amount0Max, params.amount1Max);
+    }
+
+    function burn(uint256 tokenId) external {
+        _requireApprovedForNpm(tokenId);
+        delete owners[tokenId];
+        delete liquidities[tokenId];
+    }
+
+    function positions(uint256 tokenId)
+        external
+        view
+        returns (
+            uint96 nonce,
+            address operator,
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity,
+            uint256 feeGrowthInside0LastX128,
+            uint256 feeGrowthInside1LastX128,
+            uint128 tokensOwed0,
+            uint128 tokensOwed1
+        )
+    {
+        nonce = 0;
+        operator = address(0);
+        token0 = address(0);
+        token1 = address(0);
+        fee = 0;
+        tickLower = 0;
+        tickUpper = 0;
+        liquidity = liquidities[tokenId];
+        feeGrowthInside0LastX128 = 0;
+        feeGrowthInside1LastX128 = 0;
+        tokensOwed0 = 0;
+        tokensOwed1 = 0;
+    }
+
+    function _requireApprovedForNpm(uint256 tokenId) internal view {
+        address owner = owners[tokenId];
+        require(
+            msg.sender == owner || tokenApprovals[tokenId] == msg.sender || operatorApprovals[owner][msg.sender],
+            "not approved"
+        );
+    }
+}
+
 /// @notice Tick math (no fork) plus fork flows for mint / decrease / collect / burn.
 contract UniswapV3LiquidityNftExampleTest is Test {
     address internal constant NPM = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
@@ -44,6 +145,53 @@ contract UniswapV3LiquidityNftExampleTest is Test {
     function testFloorTickToSpacingHandlesNegativeTicks() public view {
         assertEq(example.floorTickToSpacing(-55, 60), -60);
         assertEq(example.floorTickToSpacing(65, 60), 60);
+    }
+
+    function testCollectFeesRejectsCallerWhoOnlyReliesOnHelperApproval() public {
+        MockV3PositionManager mockNpm = new MockV3PositionManager();
+        UniswapV3LiquidityNftExample localExample = new UniswapV3LiquidityNftExample(address(mockNpm));
+        address lp = makeAddr("approvedLp");
+        address attacker = makeAddr("attacker");
+        uint256 tokenId = 1;
+
+        mockNpm.mintMock(lp, tokenId, 100);
+        vm.prank(lp);
+        mockNpm.setApprovalForAll(address(localExample), true);
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV3LiquidityNftExample.UnauthorizedPositionOperator.selector);
+        localExample.collectFees(tokenId, attacker, type(uint128).max, type(uint128).max);
+    }
+
+    function testDecreaseLiquidityRejectsCallerWhoOnlyReliesOnHelperApproval() public {
+        MockV3PositionManager mockNpm = new MockV3PositionManager();
+        UniswapV3LiquidityNftExample localExample = new UniswapV3LiquidityNftExample(address(mockNpm));
+        address lp = makeAddr("approvedLp");
+        address attacker = makeAddr("attacker");
+        uint256 tokenId = 1;
+
+        mockNpm.mintMock(lp, tokenId, 100);
+        vm.prank(lp);
+        mockNpm.setApprovalForAll(address(localExample), true);
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV3LiquidityNftExample.UnauthorizedPositionOperator.selector);
+        localExample.decreaseLiquidityAmount(tokenId, 1, 0, 0, block.timestamp + 1 hours);
+    }
+
+    function testPositionOwnerCanCollectThroughApprovedHelper() public {
+        MockV3PositionManager mockNpm = new MockV3PositionManager();
+        UniswapV3LiquidityNftExample localExample = new UniswapV3LiquidityNftExample(address(mockNpm));
+        address lp = makeAddr("approvedLp");
+        uint256 tokenId = 1;
+
+        mockNpm.mintMock(lp, tokenId, 100);
+        vm.startPrank(lp);
+        mockNpm.setApprovalForAll(address(localExample), true);
+        localExample.collectFees(tokenId, lp, 13, 17);
+        vm.stopPrank();
+
+        assertEq(mockNpm.lastCollectRecipient(), lp);
     }
 
     /// @dev Mint sends the NFT to `msg.sender`; asymmetric deposits are normal when price sits inside the range.

@@ -2,10 +2,84 @@
 pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
+import {ERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
 
 import {IUniswapV3Factory, IUniswapV3Pool} from "../../src/21-uniswap-v3/interfaces/IUniswapV3.sol";
 import {UniswapV3SwapExample} from "../../src/21-uniswap-v3/UniswapV3SwapExample.sol";
+
+contract MockV3Token is ERC20 {
+    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
+
+contract MockV3Factory {
+    mapping(bytes32 => address) internal pools;
+
+    function setPool(address tokenA, address tokenB, uint24 fee, address pool) external {
+        pools[_poolKey(tokenA, tokenB, fee)] = pool;
+        pools[_poolKey(tokenB, tokenA, fee)] = pool;
+    }
+
+    function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool) {
+        return pools[_poolKey(tokenA, tokenB, fee)];
+    }
+
+    function _poolKey(address tokenA, address tokenB, uint24 fee) internal pure returns (bytes32) {
+        return keccak256(abi.encode(tokenA, tokenB, fee));
+    }
+}
+
+contract FakeV3Pool {
+    address public immutable token0;
+    address public immutable token1;
+    uint24 public immutable fee;
+
+    constructor(address token0_, address token1_, uint24 fee_) {
+        token0 = token0_;
+        token1 = token1_;
+        fee = fee_;
+    }
+
+    function liquidity() external pure returns (uint128) {
+        return 0;
+    }
+
+    function slot0()
+        external
+        pure
+        returns (
+            uint160 sqrtPriceX96,
+            int24 tick,
+            uint16 observationIndex,
+            uint16 observationCardinality,
+            uint16 observationCardinalityNext,
+            uint8 feeProtocol,
+            bool unlocked
+        )
+    {
+        sqrtPriceX96;
+        tick;
+        observationIndex;
+        observationCardinality;
+        observationCardinalityNext;
+        feeProtocol;
+        unlocked = true;
+    }
+
+    function swap(address, bool, int256, uint160, bytes calldata)
+        external
+        pure
+        returns (int256 amount0, int256 amount1)
+    {
+        return (0, 0);
+    }
+
+    function flash(address, uint256, uint256, bytes calldata) external pure {}
+}
 
 interface IWETH {
     function deposit() external payable;
@@ -213,6 +287,12 @@ contract UniswapV3SwapExampleTest is Test {
         assertTrue(pool != address(0));
     }
 
+    function _installMockFactoryPool(address token0, address token1, uint24 fee, address pool) internal {
+        MockV3Factory factory = new MockV3Factory();
+        vm.etch(FACTORY, address(factory).code);
+        MockV3Factory(FACTORY).setPool(token0, token1, fee, pool);
+    }
+
     /// @dev Pool `flash`: receive `token0` (DAI for WETH/DAI 0.3%), repay `amount + fee` in callback (`fee` tier / 1e6, rounded up).
     function testFlashLoanDaiToken0() public {
         _skipIfNoFork();
@@ -307,6 +387,48 @@ contract UniswapV3SwapExampleTest is Test {
         vm.expectRevert();
         example.flashLoan(pool, user, borrow, 0);
         vm.stopPrank();
+    }
+
+    function testFlashCallbackRejectsForgedPoolBeforeTransfer() public {
+        MockV3Token token0 = new MockV3Token("Token 0", "TK0");
+        MockV3Token token1 = new MockV3Token("Token 1", "TK1");
+        FakeV3Pool fakePool = new FakeV3Pool(address(token0), address(token1), FEE_030);
+        _installMockFactoryPool(address(token0), address(token1), FEE_030, makeAddr("canonicalPool"));
+
+        address victim = makeAddr("approvedVictim");
+        uint256 victimBalance = 100 ether;
+        token0.mint(victim, victimBalance);
+        vm.prank(victim);
+        token0.approve(address(example), type(uint256).max);
+
+        bytes memory data = abi.encode(victim, address(fakePool), 10 ether, 0, victim);
+        vm.prank(address(fakePool));
+        vm.expectRevert(UniswapV3SwapExample.NotPool.selector);
+        example.uniswapV3FlashCallback(0, 0, data);
+
+        assertEq(token0.balanceOf(victim), victimBalance);
+        assertEq(token0.balanceOf(address(fakePool)), 0);
+    }
+
+    function testSwapCallbackRejectsForgedPoolBeforeTransfer() public {
+        MockV3Token token0 = new MockV3Token("Token 0", "TK0");
+        MockV3Token token1 = new MockV3Token("Token 1", "TK1");
+        FakeV3Pool fakePool = new FakeV3Pool(address(token0), address(token1), FEE_030);
+        _installMockFactoryPool(address(token0), address(token1), FEE_030, makeAddr("canonicalPool"));
+
+        address victim = makeAddr("approvedSwapVictim");
+        uint256 victimBalance = 100 ether;
+        token0.mint(victim, victimBalance);
+        vm.prank(victim);
+        token0.approve(address(example), type(uint256).max);
+
+        bytes memory data = abi.encode(victim, address(fakePool), victim);
+        vm.prank(address(fakePool));
+        vm.expectRevert(UniswapV3SwapExample.NotPool.selector);
+        example.uniswapV3SwapCallback(10 ether, 0, data);
+
+        assertEq(token0.balanceOf(victim), victimBalance);
+        assertEq(token0.balanceOf(address(fakePool)), 0);
     }
 
     /// @dev Asserts `FlashLoan` payload matches pool fee and initiator.
