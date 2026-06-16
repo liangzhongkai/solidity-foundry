@@ -6,7 +6,7 @@ import {console} from "forge-std@1.14.0/console.sol";
 import {exp} from "../src/Exp.sol";
 import {Strings} from "openzeppelin-contracts@5.4.0/utils/Strings.sol";
 
-// FOUNDRY_FUZZ_RUNS=100 forge test --match-path test/DifferentialTest.t.sol --ffi -vvv
+// RUN_FFI_TESTS=true FOUNDRY_FUZZ_RUNS=100 forge test --match-path test/DifferentialTest.t.sol --ffi -vvv
 
 contract DifferentialTest is Test {
     using Strings for uint256;
@@ -15,11 +15,17 @@ contract DifferentialTest is Test {
 
     function setUp() public {}
 
+    function shouldRunFfiTests() private view returns (bool) {
+        bool runFfiTests = vm.envOr("RUN_FFI_TESTS", false);
+        string memory profile = vm.envOr("FOUNDRY_PROFILE", string(""));
+        return runFfiTests || keccak256(bytes(profile)) == keccak256(bytes("ci"));
+    }
+
     function ffi_exp(int128 x) private returns (int128) {
         require(x >= 0, "x < 0");
 
         string[] memory inputs = new string[](3);
-        inputs[0] = "python";
+        inputs[0] = "python3";
         inputs[1] = "exp.py";
         inputs[2] = uint256(int256(x)).toString();
 
@@ -30,6 +36,10 @@ contract DifferentialTest is Test {
     }
 
     function test_exp(int128 x) public {
+        if (!shouldRunFfiTests()) {
+            vm.skip(true);
+        }
+
         // 2**64 = 1 (64.64 bit number)
         vm.assume(x >= 2 ** 64);
         vm.assume(x <= 20 * 2 ** 64);
