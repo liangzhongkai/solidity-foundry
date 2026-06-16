@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
 import {IERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/IERC721.sol";
+import {ERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/ERC721.sol";
 
 import {UniswapV3LiquidityNftExample} from "../../src/21-uniswap-v3/UniswapV3LiquidityNftExample.sol";
 import {
@@ -14,6 +15,17 @@ import {
 
 interface IWETH {
     function deposit() external payable;
+}
+
+contract MockV3PositionNft is ERC721 {
+    uint256 public nextTokenId = 1;
+
+    constructor() ERC721("Mock V3 Position", "MV3P") {}
+
+    function mint(address owner) external returns (uint256 tokenId) {
+        tokenId = nextTokenId++;
+        _mint(owner, tokenId);
+    }
 }
 
 /// @notice Tick math (no fork) plus fork flows for mint / decrease / collect / burn.
@@ -44,6 +56,21 @@ contract UniswapV3LiquidityNftExampleTest is Test {
     function testFloorTickToSpacingHandlesNegativeTicks() public view {
         assertEq(example.floorTickToSpacing(-55, 60), -60);
         assertEq(example.floorTickToSpacing(65, 60), 60);
+    }
+
+    function testApprovedWrapperDoesNotLetAttackerCollectPosition() public {
+        MockV3PositionNft npm = new MockV3PositionNft();
+        UniswapV3LiquidityNftExample localExample = new UniswapV3LiquidityNftExample(address(npm));
+        address lp = makeAddr("lp");
+        address attacker = makeAddr("attacker");
+        uint256 tokenId = npm.mint(lp);
+
+        vm.prank(lp);
+        npm.setApprovalForAll(address(localExample), true);
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV3LiquidityNftExample.NotPositionOwnerOrApproved.selector);
+        localExample.collectFees(tokenId, attacker, type(uint128).max, type(uint128).max);
     }
 
     /// @dev Mint sends the NFT to `msg.sender`; asymmetric deposits are normal when price sits inside the range.

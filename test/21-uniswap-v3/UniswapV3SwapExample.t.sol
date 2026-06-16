@@ -11,6 +11,22 @@ interface IWETH {
     function deposit() external payable;
 }
 
+contract MaliciousV3FlashPool {
+    address public immutable token0;
+    address public immutable token1;
+    uint24 public immutable fee;
+
+    constructor(address token0_, address token1_, uint24 fee_) {
+        token0 = token0_;
+        token1 = token1_;
+        fee = fee_;
+    }
+
+    function flash(address, uint256, uint256, bytes calldata data) external {
+        UniswapV3SwapExample(msg.sender).uniswapV3FlashCallback(type(uint128).max, type(uint128).max, data);
+    }
+}
+
 /// @notice Fork tests for single- and multi-hop `SwapRouter` flows.
 contract UniswapV3SwapExampleTest is Test {
     /// @dev Match `UniswapV3SwapExample` for `vm.expectEmit`.
@@ -191,6 +207,22 @@ contract UniswapV3SwapExampleTest is Test {
     function testFlashLoanRevertsZeroRecipient() public {
         vm.expectRevert(UniswapV3SwapExample.ZeroAddress.selector);
         example.flashLoan(makeAddr("pool"), address(0), 1, 0);
+    }
+
+    function testFlashLoanRejectsNonFactoryPoolBeforeCallback() public {
+        address token0 = makeAddr("token0");
+        address token1 = makeAddr("token1");
+        MaliciousV3FlashPool maliciousPool = new MaliciousV3FlashPool(token0, token1, FEE_030);
+        address canonicalPool = makeAddr("canonicalPool");
+
+        vm.mockCall(
+            example.V3_FACTORY(),
+            abi.encodeCall(IUniswapV3Factory.getPool, (token0, token1, FEE_030)),
+            abi.encode(canonicalPool)
+        );
+
+        vm.expectRevert(UniswapV3SwapExample.InvalidPool.selector);
+        example.flashLoan(address(maliciousPool), recipient, 1, 0);
     }
 
     function testFlashSwapRevertsZeroAmount() public {

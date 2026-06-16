@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {IERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/IERC721.sol";
 
 import {UniswapV4PoolManagerExample} from "../../src/22-uniswap-v4/UniswapV4PoolManagerExample.sol";
 import {UniswapV4PositionManagerExample} from "../../src/22-uniswap-v4/UniswapV4PositionManagerExample.sol";
@@ -108,9 +109,10 @@ abstract contract UniswapV4Base is Test {
             MAX_DAI,
             MAX_WETH,
             block.timestamp + 1 hours,
-            address(positionExample),
+            funder,
             bytes("")
         );
+        IERC721(POSITION_MANAGER).setApprovalForAll(address(positionExample), true);
         vm.stopPrank();
     }
 }

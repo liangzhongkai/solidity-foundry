@@ -5,6 +5,7 @@ import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 import {
+    IUniswapV3Factory,
     ISwapRouter,
     IUniswapV3Pool,
     IUniswapV3SwapCallback,
@@ -19,6 +20,7 @@ import {
 contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback {
     using SafeERC20 for IERC20;
 
+    address public constant V3_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
     address public constant SWAP_ROUTER = 0xE592427A0AEce92De3Edee1F18E0157C05861564;
 
     /// @dev Uniswap V3 `TickMath.MIN_SQRT_RATIO + 1` (flash swap limit when swapping token0 -> token1).
@@ -59,6 +61,7 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
     error ZeroAddress();
     error InvalidPath();
     error NotPool();
+    error InvalidPool();
     error InvalidToken();
     error ZeroAmount();
 
@@ -138,6 +141,7 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
     function flashLoan(address pool, address recipient, uint256 amount0, uint256 amount1) external {
         if (pool == address(0) || recipient == address(0)) revert ZeroAddress();
         if (amount0 == 0 && amount1 == 0) revert ZeroAmount();
+        _requireCanonicalPool(pool);
 
         bytes memory data = abi.encode(msg.sender, pool, amount0, amount1, recipient);
         // slither-disable-next-line reentrancy-events -- full flash completes before emit; no state deps after pool call
@@ -150,6 +154,7 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
     function flashSwapExactOutput(address pool, address tokenOut, uint256 amountOut, address recipient) external {
         if (pool == address(0) || recipient == address(0)) revert ZeroAddress();
         if (amountOut == 0) revert ZeroAmount();
+        _requireCanonicalPool(pool);
 
         IUniswapV3Pool p = IUniswapV3Pool(pool);
         address t0 = p.token0();
@@ -174,6 +179,7 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
         (address initiator, address pool, uint256 amt0, uint256 amt1, address recipient) =
             abi.decode(data, (address, address, uint256, uint256, address));
         if (msg.sender != pool) revert NotPool();
+        _requireCanonicalPool(pool);
         _repayFlashLoan(initiator, pool, amt0, amt1, fee0, fee1);
         emit FlashLoan(pool, initiator, recipient, amt0, amt1, fee0, fee1);
     }
@@ -182,8 +188,17 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external override {
         (address initiator, address pool, address recipient) = abi.decode(data, (address, address, address));
         if (msg.sender != pool) revert NotPool();
+        _requireCanonicalPool(pool);
         _paySwapOwed(initiator, pool, amount0Delta, amount1Delta);
         emit FlashSwap(pool, initiator, recipient, amount0Delta, amount1Delta);
+    }
+
+    function _requireCanonicalPool(address pool) private view {
+        IUniswapV3Pool p = IUniswapV3Pool(pool);
+        address token0 = p.token0();
+        address token1 = p.token1();
+        uint24 fee = p.fee();
+        if (IUniswapV3Factory(V3_FACTORY).getPool(token0, token1, fee) != pool) revert InvalidPool();
     }
 
     function _repayFlashLoan(address initiator, address pool, uint256 amt0, uint256 amt1, uint256 fee0, uint256 fee1)
