@@ -28,6 +28,8 @@ contract CosmosERC20 is ERC20 {
 contract Gravity {
     using SafeERC20 for IERC20;
 
+    address public immutable batchSubmitter;
+
     address[] public validators;
     mapping(address => uint256) public validatorPower;
     uint256 public totalPower;
@@ -53,8 +55,10 @@ contract Gravity {
     error InvalidTokenContract();
     error CustodyAssetCollision();
     error DenomCollision();
+    error UnauthorizedBatchSubmitter();
 
     constructor(address[] memory validators_, uint256[] memory powers_) {
+        batchSubmitter = msg.sender;
         for (uint256 i = 0; i < validators_.length; i++) {
             validators.push(validators_[i]);
             validatorPower[validators_[i]] = powers_[i];
@@ -140,6 +144,7 @@ contract Gravity {
 
     /// @notice Validators sign withdrawal batches; bridge releases mapped ERC20 from custody.
     function submitWithdrawalBatch(string calldata cosmosDenom, address destination, uint256 amount) external {
+        if (msg.sender != batchSubmitter) revert UnauthorizedBatchSubmitter();
         address token = denomToERC20Lookup(cosmosDenom);
         if (token == address(0)) revert UnknownDenom();
         IERC20(token).safeTransfer(destination, amount);
