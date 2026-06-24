@@ -39,6 +39,7 @@ contract UniswapV4PositionManagerExampleTest is UniswapV4Base {
         assertGt(liquidityAfterIncrease, 0);
 
         address feeRecipient = makeAddr("fee-recipient");
+        vm.startPrank(funder);
         positionExample.collectFees(tokenId, block.timestamp + 1 hours, feeRecipient, bytes(""));
         positionExample.decreaseLiquidity(
             tokenId, liquidityAfterIncrease / 2, 0, 0, block.timestamp + 1 hours, feeRecipient, bytes("")
@@ -49,6 +50,7 @@ contract UniswapV4PositionManagerExampleTest is UniswapV4Base {
 
         address burnRecipient = makeAddr("burn-recipient");
         positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, burnRecipient, bytes(""));
+        vm.stopPrank();
         vm.expectRevert();
         positionExample.getPositionLiquidity(tokenId);
     }
