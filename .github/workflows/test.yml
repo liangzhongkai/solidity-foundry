@@ -109,6 +109,5 @@ jobs:
           pip install "manticore==0.3.7"
           manticore-verifier src/manticore/CounterManticore.sol \
             --contract_name CounterManticore \
-            --compile-force-framework foundry \
-            --maxt 2 \
-            --timeout 600
+            --config-file crytic_compile.config.json \
+            --timeout 300
