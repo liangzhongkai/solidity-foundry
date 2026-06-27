@@ -13,6 +13,8 @@ contract VyperStorageTest is Test {
     IVyperStorage vyStorage;
 
     function setUp() public {
+        if (!vm.envOr("RUN_FFI_TESTS", false)) vm.skip(true);
+
         vyStorage = IVyperStorage(vyperDeployer.deployContract("VyperStorage", abi.encode(1234)));
 
         targetContract(address(vyStorage));

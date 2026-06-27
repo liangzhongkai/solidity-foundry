@@ -13,13 +13,15 @@ contract DifferentialTest is Test {
 
     uint256 private constant DELTA = 2 ** 64;
 
-    function setUp() public {}
+    function setUp() public {
+        if (!vm.envOr("RUN_FFI_TESTS", false)) vm.skip(true);
+    }
 
     function ffi_exp(int128 x) private returns (int128) {
         require(x >= 0, "x < 0");
 
         string[] memory inputs = new string[](3);
-        inputs[0] = "python";
+        inputs[0] = "python3";
         inputs[1] = "exp.py";
         inputs[2] = uint256(int256(x)).toString();
 
