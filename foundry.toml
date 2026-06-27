@@ -16,6 +16,10 @@ sepolia = { key = "${ETHERSCAN_API_KEY}" }
 [profile.ci]
 ffi = true
 
+# Manticore 0.3.7 does not support Shanghai PUSH0 bytecode emitted by solc 0.8.20.
+[profile.manticore]
+evm_version = "paris"
+
 # # 静默编译模式 - 禁用所有警告和 lint 提示
 # [profile.silent]
 # verbosity = 0

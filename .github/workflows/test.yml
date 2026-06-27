@@ -98,6 +98,7 @@ jobs:
 
       - name: Run Manticore verifier
         run: |
+          export FOUNDRY_PROFILE=manticore
           forge build --build-info --sizes
           python -m venv .manticore-venv
           . .manticore-venv/bin/activate
@@ -111,5 +112,4 @@ jobs:
             --contract_name CounterManticore \
             --compile-force-framework foundry \
             --maxt 2 \
-            --timeout 600 \
-            --no-testcases
+            --timeout 600
