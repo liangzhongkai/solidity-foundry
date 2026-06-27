@@ -7,6 +7,10 @@ import {console} from "forge-std@1.14.0/console.sol";
 // forge test --match-path test/FFI.t.sol --ffi -vvvv
 
 contract FFITest is Test {
+    function setUp() public {
+        if (!vm.envOr("RUN_FFI_TESTS", false)) vm.skip(true);
+    }
+
     function testFFI() public {
         string memory path = string.concat(vm.projectRoot(), "/remappings.txt");
         string[] memory cmds = new string[](2);

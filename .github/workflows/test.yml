@@ -46,6 +46,8 @@ jobs:
         run: forge build --sizes --build-info
 
       - name: Run Forge tests
+        env:
+          RUN_FFI_TESTS: "true"
         run: forge test -vvv --ffi
 
       - name: Generate gas report

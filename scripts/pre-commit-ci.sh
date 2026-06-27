@@ -10,8 +10,8 @@ forge fmt --check
 echo "[2/6] forge build --sizes --build-info"
 forge build --sizes --build-info
 
-echo "[3/6] forge test -vvv --ffi"
-forge test -vvv --ffi
+echo "[3/6] RUN_FFI_TESTS=true forge test -vvv --ffi"
+RUN_FFI_TESTS=true forge test -vvv --ffi
 
 # Slither 静态分析 (仅 high 及以上严重性会导致失败)
 echo "[4/6] Slither..."
