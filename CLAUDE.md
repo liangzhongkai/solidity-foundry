@@ -26,7 +26,7 @@ forge snapshot                       # Generate gas snapshots
 forge test --fork-url $MAINNET_FORK_URL --fork-block-number 21000000 --match-path test/Fork.t.sol
 
 # FFI tests (differential testing with Python)
-forge test --match-path test/DifferentialTest.t.sol --ffi
+RUN_FFI_TESTS=true forge test --match-path test/DifferentialTest.t.sol --ffi
 
 # Fuzz tests with more runs
 FOUNDRY_FUZZ_RUNS=1000 forge test --match-path test/Fuzz.t.sol
@@ -91,7 +91,7 @@ Import paths use versioned remappings:
 - Solidity version: `0.8.20` (set in `foundry.toml`)
 - Optimizer: enabled with 200 runs
 - Fuzz runs: 256 (default)
-- CI profile enables FFI for differential tests
+- FFI is disabled by default; FFI tests require both `RUN_FFI_TESTS=true` and `--ffi`
 
 ## Security Tools
 
