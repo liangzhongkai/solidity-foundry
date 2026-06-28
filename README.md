@@ -37,7 +37,7 @@ FFI tests (e.g. `DifferentialTest.t.sol`) require Python and `eth-abi`:
 
 ```shell
 pip install -r requirements.txt
-forge test --ffi
+RUN_FFI_TESTS=true forge test --ffi
 ```
 
 ### Format

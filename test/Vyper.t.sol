@@ -6,13 +6,15 @@ import {VyperDeployer} from "../lib/utils/VyperDeployer.sol";
 import {IVyperStorage} from "../src/IVyperStorage.sol";
 
 // source venv/bin/activate
-// forge test --match-path test/Vyper.t.sol --ffi
+// RUN_FFI_TESTS=true forge test --match-path test/Vyper.t.sol --ffi
 contract VyperStorageTest is Test {
     VyperDeployer vyperDeployer = new VyperDeployer();
 
     IVyperStorage vyStorage;
 
     function setUp() public {
+        if (!vm.envOr("RUN_FFI_TESTS", false)) vm.skip(true);
+
         vyStorage = IVyperStorage(vyperDeployer.deployContract("VyperStorage", abi.encode(1234)));
 
         targetContract(address(vyStorage));

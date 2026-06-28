@@ -7,9 +7,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  FOUNDRY_PROFILE: ci
-
 jobs:
   check:
     name: Foundry project
@@ -46,7 +43,15 @@ jobs:
         run: forge build --sizes --build-info
 
       - name: Run Forge tests
-        run: forge test -vvv --ffi
+        run: forge test -vvv
+
+      - name: Run explicit FFI tests
+        env:
+          RUN_FFI_TESTS: "true"
+        run: |
+          forge test --match-path test/FFI.t.sol --ffi -vvv
+          FOUNDRY_FUZZ_RUNS=100 forge test --match-path test/DifferentialTest.t.sol --ffi -vvv
+          forge test --match-path test/Vyper.t.sol --ffi -vvv
 
       - name: Generate gas report
         run: |
