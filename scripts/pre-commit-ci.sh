@@ -24,7 +24,7 @@ slither . --config-file slither.config.json --fail-high
 # Manticore 符号执行 (短超时，仅分析 CounterManticore)
 if command -v manticore-verifier &>/dev/null; then
   echo "[6/7] Manticore..."
-  manticore-verifier src/manticore/CounterManticore.sol \
+  FOUNDRY_PROFILE=manticore manticore-verifier src/manticore/CounterManticore.sol \
     --contract_name CounterManticore \
     --compile-force-framework foundry \
     --maxt 2 \
