@@ -8,6 +8,8 @@ import {console} from "forge-std@1.14.0/console.sol";
 
 contract FFITest is Test {
     function testFFI() public {
+        if (!vm.envOr("RUN_FFI_TESTS", false)) vm.skip(true);
+
         string memory path = string.concat(vm.projectRoot(), "/remappings.txt");
         string[] memory cmds = new string[](2);
         cmds[0] = "cat";
