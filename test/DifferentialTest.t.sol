@@ -19,7 +19,7 @@ contract DifferentialTest is Test {
         require(x >= 0, "x < 0");
 
         string[] memory inputs = new string[](3);
-        inputs[0] = "python";
+        inputs[0] = "python3";
         inputs[1] = "exp.py";
         inputs[2] = uint256(int256(x)).toString();
 
@@ -30,6 +30,8 @@ contract DifferentialTest is Test {
     }
 
     function test_exp(int128 x) public {
+        if (!vm.envOr("RUN_FFI_TESTS", false)) vm.skip(true);
+
         // 2**64 = 1 (64.64 bit number)
         vm.assume(x >= 2 ** 64);
         vm.assume(x <= 20 * 2 ** 64);
