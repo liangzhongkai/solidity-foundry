@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
 
 import {PoolId, PoolIdLibrary, PoolKey, PositionInfo} from "../../src/22-uniswap-v4/interfaces/IUniswapV4.sol";
+import {UniswapV4PositionManagerExample} from "../../src/22-uniswap-v4/UniswapV4PositionManagerExample.sol";
 import {UniswapV4Base} from "./UniswapV4Base.t.sol";
 
 contract UniswapV4PositionManagerExampleTest is UniswapV4Base {
