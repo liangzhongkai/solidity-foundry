@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {IERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/IERC721.sol";
 import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 import {
@@ -43,6 +44,7 @@ contract UniswapV4PositionManagerExample {
 
     IPositionManager public immutable positionManager;
     IPermit2 public immutable permit2;
+    mapping(uint256 tokenId => address controller) public positionController;
 
     event Permit2Approval(address indexed token, uint160 amount, uint48 expiration);
     event PositionMinted(uint256 indexed tokenId, address indexed recipient, PoolId indexed poolId);
@@ -55,6 +57,7 @@ contract UniswapV4PositionManagerExample {
     error InvalidAmount();
     error InvalidRecipient();
     error NativeCurrencyNotSupported();
+    error NotPositionController();
 
     constructor(address positionManager_, address permit2_) {
         if (positionManager_ == address(0) || permit2_ == address(0)) revert ZeroAddress();
@@ -179,6 +182,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) external {
         if (liquidity == 0) revert InvalidAmount();
+        _requirePositionController(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
 
         (address token0, address token1) = _pullPair(key, amount0Max, amount1Max);
@@ -206,6 +210,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) public {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionController(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeDecreaseLiquidityUnlockData(key, tokenId, liquidity, amount0Min, amount1Min, recipient, hookData),
@@ -231,6 +236,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) external {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionController(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeBurnPositionUnlockData(key, tokenId, amount0Min, amount1Min, recipient, hookData), deadline
@@ -289,9 +295,16 @@ contract UniswapV4PositionManagerExample {
             params.hookData
         );
         positionManager.modifyLiquidities(unlockData, params.deadline);
+        positionController[tokenId] = params.recipient == address(this) ? msg.sender : params.recipient;
         _refundTokenDelta(token0, msg.sender, startBalance0);
         _refundTokenDelta(token1, msg.sender, startBalance1);
 
         emit PositionMinted(tokenId, params.recipient, key.toId());
+    }
+
+    function _requirePositionController(uint256 tokenId) internal view {
+        address owner = IERC721(address(positionManager)).ownerOf(tokenId);
+        address controller = owner == address(this) ? positionController[tokenId] : owner;
+        if (controller == address(0) || controller != msg.sender) revert NotPositionController();
     }
 }

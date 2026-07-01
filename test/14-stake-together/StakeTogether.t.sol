@@ -43,6 +43,13 @@ contract StakeTogetherTest is Test {
         assertEq(cloudCoin.balanceOf(address(staking)), REWARD_POOL);
     }
 
+    function test_CloudCoin_MintRestrictedToOwner() public {
+        vm.startPrank(alice);
+        vm.expectRevert();
+        cloudCoin.mint(alice, 1);
+        vm.stopPrank();
+    }
+
     function test_Stake_HappyPath() public {
         vm.warp(beginDate);
         vm.prank(alice);
