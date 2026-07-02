@@ -23,6 +23,7 @@ contract UniswapV3LiquidityNftExample {
 
     error ZeroAddress();
     error UnsupportedFeeTier();
+    error UnauthorizedPositionCaller();
 
     constructor(address positionManager_) {
         if (positionManager_ == address(0)) revert ZeroAddress();
@@ -98,6 +99,8 @@ contract UniswapV3LiquidityNftExample {
         uint256 amount1Min,
         uint256 deadline
     ) external returns (uint256 amount0, uint256 amount1) {
+        _requirePositionOwner(tokenId);
+
         INonfungiblePositionManager.DecreaseLiquidityParams memory params =
             INonfungiblePositionManager.DecreaseLiquidityParams({
                 tokenId: tokenId,
@@ -118,6 +121,7 @@ contract UniswapV3LiquidityNftExample {
         returns (uint256 amount0, uint256 amount1)
     {
         if (recipient == address(0)) revert ZeroAddress();
+        _requirePositionOwner(tokenId);
 
         INonfungiblePositionManager.CollectParams memory params = INonfungiblePositionManager.CollectParams({
             tokenId: tokenId, recipient: recipient, amount0Max: amount0Max, amount1Max: amount1Max
@@ -135,6 +139,8 @@ contract UniswapV3LiquidityNftExample {
         uint256 amount1MinDecrease,
         uint256 deadline
     ) external {
+        _requirePositionOwner(tokenId);
+
         // slither-disable-next-line unused-return -- only `liquidity` is needed for the burn sequence
         (,,,,,,, uint128 liq,,,,) = positionManager.positions(tokenId);
         if (liq > 0) {
@@ -167,6 +173,10 @@ contract UniswapV3LiquidityNftExample {
         IERC20(token1).safeTransferFrom(msg.sender, address(this), amount1Desired);
         IERC20(token0).forceApprove(address(positionManager), amount0Desired);
         IERC20(token1).forceApprove(address(positionManager), amount1Desired);
+    }
+
+    function _requirePositionOwner(uint256 tokenId) internal view {
+        if (positionManager.ownerOf(tokenId) != msg.sender) revert UnauthorizedPositionCaller();
     }
 
     function _resolveTokensAndAmounts(address tokenA, address tokenB, uint256 amountADesired, uint256 amountBDesired)
