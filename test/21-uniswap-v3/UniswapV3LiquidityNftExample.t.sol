@@ -16,6 +16,78 @@ interface IWETH {
     function deposit() external payable;
 }
 
+contract MockV3PositionManager {
+    mapping(uint256 tokenId => address owner) internal owners;
+
+    function setOwner(uint256 tokenId, address owner) external {
+        owners[tokenId] = owner;
+    }
+
+    function factory() external pure returns (address) {
+        return address(0);
+    }
+
+    function ownerOf(uint256 tokenId) external view returns (address owner) {
+        owner = owners[tokenId];
+        if (owner == address(0)) revert("owner query for nonexistent token");
+    }
+
+    function mint(INonfungiblePositionManager.MintParams calldata)
+        external
+        pure
+        returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)
+    {
+        return (0, 0, 0, 0);
+    }
+
+    function collect(INonfungiblePositionManager.CollectParams calldata)
+        external
+        pure
+        returns (uint256 amount0, uint256 amount1)
+    {
+        return (0, 0);
+    }
+
+    function increaseLiquidity(INonfungiblePositionManager.IncreaseLiquidityParams calldata)
+        external
+        pure
+        returns (uint128 liquidity, uint256 amount0, uint256 amount1)
+    {
+        return (0, 0, 0);
+    }
+
+    function decreaseLiquidity(INonfungiblePositionManager.DecreaseLiquidityParams calldata)
+        external
+        pure
+        returns (uint256 amount0, uint256 amount1)
+    {
+        return (0, 0);
+    }
+
+    function burn(uint256) external pure {}
+
+    function positions(uint256)
+        external
+        pure
+        returns (
+            uint96 nonce,
+            address operator,
+            address token0,
+            address token1,
+            uint24 fee,
+            int24 tickLower,
+            int24 tickUpper,
+            uint128 liquidity,
+            uint256 feeGrowthInside0LastX128,
+            uint256 feeGrowthInside1LastX128,
+            uint128 tokensOwed0,
+            uint128 tokensOwed1
+        )
+    {
+        return (0, address(0), address(0), address(0), 0, 0, 0, 0, 0, 0, 0, 0);
+    }
+}
+
 /// @notice Tick math (no fork) plus fork flows for mint / decrease / collect / burn.
 contract UniswapV3LiquidityNftExampleTest is Test {
     address internal constant NPM = 0xC36442b4a4522E871399CD717aBDD847Ab11FE88;
@@ -44,6 +116,26 @@ contract UniswapV3LiquidityNftExampleTest is Test {
     function testFloorTickToSpacingHandlesNegativeTicks() public view {
         assertEq(example.floorTickToSpacing(-55, 60), -60);
         assertEq(example.floorTickToSpacing(65, 60), 60);
+    }
+
+    function testPositionActionsRevertForNonOwnerCaller() public {
+        MockV3PositionManager mockNpm = new MockV3PositionManager();
+        UniswapV3LiquidityNftExample mockExample = new UniswapV3LiquidityNftExample(address(mockNpm));
+        uint256 tokenId = 1;
+        address lp = makeAddr("lp");
+        address attacker = makeAddr("attacker");
+        mockNpm.setOwner(tokenId, lp);
+
+        vm.startPrank(attacker);
+        vm.expectRevert(UniswapV3LiquidityNftExample.UnauthorizedPositionCaller.selector);
+        mockExample.decreaseLiquidityAmount(tokenId, 1, 0, 0, block.timestamp + 1 hours);
+
+        vm.expectRevert(UniswapV3LiquidityNftExample.UnauthorizedPositionCaller.selector);
+        mockExample.collectFees(tokenId, attacker, type(uint128).max, type(uint128).max);
+
+        vm.expectRevert(UniswapV3LiquidityNftExample.UnauthorizedPositionCaller.selector);
+        mockExample.burnPositionFully(tokenId, 0, 0, block.timestamp + 1 hours);
+        vm.stopPrank();
     }
 
     /// @dev Mint sends the NFT to `msg.sender`; asymmetric deposits are normal when price sits inside the range.

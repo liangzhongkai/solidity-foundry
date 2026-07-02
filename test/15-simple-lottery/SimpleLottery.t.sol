@@ -63,6 +63,17 @@ contract SimpleLotteryTest is Test {
         lottery.purchaseTicket{value: TICKET_PRICE}(1);
     }
 
+    function test_purchaseTicket_atDrawBlock_revertsEvenBeforeTimestampDeadline() public {
+        lottery.createLottery();
+        uint64 drawBlock = _drawBlock(1);
+
+        vm.roll(drawBlock);
+
+        vm.prank(alice);
+        vm.expectRevert(SimpleLottery.PurchaseWindowClosed.selector);
+        lottery.purchaseTicket{value: TICKET_PRICE}(1);
+    }
+
     function test_claimWinnings() public {
         lottery.createLottery();
         vm.prank(alice);

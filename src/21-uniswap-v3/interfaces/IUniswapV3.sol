@@ -115,6 +115,8 @@ interface INonfungiblePositionManager {
 
     function factory() external view returns (address);
 
+    function ownerOf(uint256 tokenId) external view returns (address owner);
+
     function mint(MintParams calldata params)
         external
         payable

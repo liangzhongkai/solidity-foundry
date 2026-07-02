@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 set -e
 
-# Mirror checks from .github/workflows/test.yml
-export FOUNDRY_PROFILE=ci
-
 echo "[1/6] forge fmt --check"
 forge fmt --check
 
 echo "[2/6] forge build --sizes --build-info"
 forge build --sizes --build-info
 
-echo "[3/6] forge test -vvv --ffi"
-forge test -vvv --ffi
+echo "[3/6] forge test -vvv"
+forge test -vvv
+
+echo "[3b/6] explicit FFI tests"
+RUN_FFI_TESTS=true forge test --match-path test/FFI.t.sol --ffi -vvv
+RUN_FFI_TESTS=true FOUNDRY_FUZZ_RUNS=100 forge test --match-path test/DifferentialTest.t.sol --ffi -vvv
+RUN_FFI_TESTS=true forge test --match-path test/Vyper.t.sol --ffi -vvv
 
 # Slither 静态分析 (仅 high 及以上严重性会导致失败)
 echo "[4/6] Slither..."
