@@ -43,6 +43,7 @@ contract UniswapV4PositionManagerExample {
 
     IPositionManager public immutable positionManager;
     IPermit2 public immutable permit2;
+    mapping(uint256 tokenId => address controller) private _positionControllers;
 
     event Permit2Approval(address indexed token, uint160 amount, uint48 expiration);
     event PositionMinted(uint256 indexed tokenId, address indexed recipient, PoolId indexed poolId);
@@ -55,6 +56,7 @@ contract UniswapV4PositionManagerExample {
     error InvalidAmount();
     error InvalidRecipient();
     error NativeCurrencyNotSupported();
+    error UnauthorizedPositionCaller();
 
     constructor(address positionManager_, address permit2_) {
         if (positionManager_ == address(0) || permit2_ == address(0)) revert ZeroAddress();
@@ -75,6 +77,10 @@ contract UniswapV4PositionManagerExample {
 
     function getPositionLiquidity(uint256 tokenId) external view returns (uint128 liquidity) {
         liquidity = positionManager.getPositionLiquidity(tokenId);
+    }
+
+    function positionController(uint256 tokenId) external view returns (address controller) {
+        return _positionControllers[tokenId];
     }
 
     function getPoolAndPositionInfo(uint256 tokenId) external view returns (PoolKey memory key, PositionInfo info) {
@@ -179,6 +185,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) external {
         if (liquidity == 0) revert InvalidAmount();
+        _requirePositionCaller(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
 
         (address token0, address token1) = _pullPair(key, amount0Max, amount1Max);
@@ -206,6 +213,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) public {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionCaller(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeDecreaseLiquidityUnlockData(key, tokenId, liquidity, amount0Min, amount1Min, recipient, hookData),
@@ -231,10 +239,12 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) external {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionCaller(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeBurnPositionUnlockData(key, tokenId, amount0Min, amount1Min, recipient, hookData), deadline
         );
+        delete _positionControllers[tokenId];
         emit PositionBurned(tokenId, recipient);
     }
 
@@ -268,6 +278,13 @@ contract UniswapV4PositionManagerExample {
         }
     }
 
+    function _requirePositionCaller(uint256 tokenId) internal view {
+        address controller = _positionControllers[tokenId];
+        if (controller == msg.sender) return;
+        if (positionManager.ownerOf(tokenId) == msg.sender) return;
+        revert UnauthorizedPositionCaller();
+    }
+
     function _mintPosition(PoolKey calldata key, MintPositionParams memory params) internal returns (uint256 tokenId) {
         if (params.recipient == address(0)) revert InvalidRecipient();
         if (params.liquidity == 0) revert InvalidAmount();
@@ -289,6 +306,7 @@ contract UniswapV4PositionManagerExample {
             params.hookData
         );
         positionManager.modifyLiquidities(unlockData, params.deadline);
+        _positionControllers[tokenId] = msg.sender;
         _refundTokenDelta(token0, msg.sender, startBalance0);
         _refundTokenDelta(token1, msg.sender, startBalance1);
 
