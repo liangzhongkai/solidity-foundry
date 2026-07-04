@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {ERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/ERC20.sol";
+import {ERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/ERC721.sol";
 
 import {UniswapV4PoolManagerExample} from "../../src/22-uniswap-v4/UniswapV4PoolManagerExample.sol";
 import {UniswapV4PositionManagerExample} from "../../src/22-uniswap-v4/UniswapV4PositionManagerExample.sol";
@@ -11,6 +12,7 @@ import {UniswapV4UniversalRouterExample} from "../../src/22-uniswap-v4/UniswapV4
 import {
     BalanceDelta,
     Currency,
+    CurrencyLibrary,
     IHooks,
     IPositionManager,
     IStateView,
@@ -70,6 +72,8 @@ contract MockPoolManager {
     BalanceDelta public configuredModifyDelta;
     BalanceDelta public configuredFeesAccrued;
     BalanceDelta public configuredDonateDelta;
+    Currency public lastSyncedCurrency;
+    uint256 public syncCount;
 
     function setSwapDelta(BalanceDelta delta) external {
         configuredSwapDelta = delta;
@@ -117,13 +121,20 @@ contract MockPoolManager {
         return configuredDonateDelta;
     }
 
-    function sync(Currency) external {}
+    function sync(Currency currency) external {
+        lastSyncedCurrency = currency;
+        syncCount++;
+    }
 
     function take(Currency currency, address to, uint256 amount) external {
         MockERC20(Currency.unwrap(currency)).transfer(to, amount);
     }
 
     function settle() external payable returns (uint256 paid) {
+        if (msg.value == 0) {
+            require(!CurrencyLibrary.isAddressZero(lastSyncedCurrency), "missing sync");
+        }
+        lastSyncedCurrency = Currency.wrap(address(0));
         return 0;
     }
 
@@ -190,7 +201,7 @@ contract MockStateView is IStateView {
     }
 }
 
-contract MockPositionManager is IPositionManager {
+contract MockPositionManager is ERC721, IPositionManager {
     using PoolIdLibrary for PoolKey;
 
     uint256 public override nextTokenId = 1;
@@ -198,6 +209,8 @@ contract MockPositionManager is IPositionManager {
     mapping(uint256 => uint128) internal liquidities;
     mapping(uint256 => PoolKey) internal keys;
     mapping(uint256 => PositionInfo) internal infos;
+
+    constructor() ERC721("Mock V4 Position", "MV4") {}
 
     function modifyLiquidities(bytes calldata unlockData, uint256) external payable {
         (bytes memory actions, bytes[] memory params) = abi.decode(unlockData, (bytes, bytes[]));
@@ -222,6 +235,7 @@ contract MockPositionManager is IPositionManager {
             liquidities[tokenId] = uint128(liquidity);
             keys[tokenId] = key;
             infos[tokenId] = _packPositionInfo(key, tickLower, tickUpper);
+            _mint(recipient, tokenId);
             return;
         }
 
@@ -243,6 +257,7 @@ contract MockPositionManager is IPositionManager {
 
         if (action == 0x03) {
             (uint256 tokenId,,,) = abi.decode(params[0], (uint256, uint128, uint128, bytes));
+            _burn(tokenId);
             delete liquidities[tokenId];
             delete keys[tokenId];
             infos[tokenId] = PositionInfo.wrap(0);
@@ -324,6 +339,7 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(amountOut, 5 ether);
         assertEq(dai.balanceOf(recipient), 5 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 2 ether);
+        assertEq(mockPoolManager.syncCount(), 1);
     }
 
     function testPoolManagerModifyLiquiditySettlesNegativeDeltas() public {
@@ -349,6 +365,7 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(feesAccrued.amount1(), 0.25 ether);
         assertEq(dai.balanceOf(address(mockPoolManager)), 3 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 1 ether);
+        assertEq(mockPoolManager.syncCount(), 2);
     }
 
     function testRouterSwapUsesPermit2ApprovalAndTransfersOutput() public {
@@ -408,6 +425,17 @@ contract UniswapV4WrapperUnitTest is Test {
         uint256 tokenId = positionExample.mintPosition(
             key, -120, 120, 1e12, 10 ether, 10 ether, block.timestamp + 1 hours, address(positionExample), bytes("")
         );
+        assertEq(positionExample.positionControllers(tokenId), trader);
+        vm.stopPrank();
+
+        address attacker = makeAddr("attacker");
+        vm.prank(attacker);
+        vm.expectRevert(
+            abi.encodeWithSelector(UniswapV4PositionManagerExample.NotPositionController.selector, attacker, tokenId)
+        );
+        positionExample.decreaseLiquidity(tokenId, 1, 0, 0, block.timestamp + 1 hours, recipient, bytes(""));
+
+        vm.startPrank(trader);
         positionExample.increaseLiquidity(tokenId, 5e11, 5 ether, 5 ether, block.timestamp + 1 hours, bytes(""));
         positionExample.decreaseLiquidity(tokenId, 5e11, 0, 0, block.timestamp + 1 hours, recipient, bytes(""));
         positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, recipient, bytes(""));

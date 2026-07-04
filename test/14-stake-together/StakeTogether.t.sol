@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {Ownable} from "openzeppelin-contracts@5.4.0/access/Ownable.sol";
 import {CloudCoin} from "../../src/14-stake-together/CloudCoin.sol";
 import {StakeTogether} from "../../src/14-stake-together/StakeTogether.sol";
 
@@ -41,6 +42,12 @@ contract StakeTogetherTest is Test {
         assertEq(staking.beginDate(), beginDate);
         assertEq(staking.expiration(), expiration);
         assertEq(cloudCoin.balanceOf(address(staking)), REWARD_POOL);
+    }
+
+    function test_CloudCoin_Mint_RevertsForNonOwner() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        cloudCoin.mint(alice, 1);
     }
 
     function test_Stake_HappyPath() public {

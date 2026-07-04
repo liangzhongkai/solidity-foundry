@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
+import {IERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/IERC721.sol";
 import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
 
 import {
@@ -43,6 +44,7 @@ contract UniswapV4PositionManagerExample {
 
     IPositionManager public immutable positionManager;
     IPermit2 public immutable permit2;
+    mapping(uint256 tokenId => address controller) public positionControllers;
 
     event Permit2Approval(address indexed token, uint160 amount, uint48 expiration);
     event PositionMinted(uint256 indexed tokenId, address indexed recipient, PoolId indexed poolId);
@@ -55,6 +57,7 @@ contract UniswapV4PositionManagerExample {
     error InvalidAmount();
     error InvalidRecipient();
     error NativeCurrencyNotSupported();
+    error NotPositionController(address caller, uint256 tokenId);
 
     constructor(address positionManager_, address permit2_) {
         if (positionManager_ == address(0) || permit2_ == address(0)) revert ZeroAddress();
@@ -179,6 +182,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) external {
         if (liquidity == 0) revert InvalidAmount();
+        _requirePositionController(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
 
         (address token0, address token1) = _pullPair(key, amount0Max, amount1Max);
@@ -206,6 +210,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) public {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionController(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeDecreaseLiquidityUnlockData(key, tokenId, liquidity, amount0Min, amount1Min, recipient, hookData),
@@ -231,10 +236,12 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) external {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionController(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeBurnPositionUnlockData(key, tokenId, amount0Min, amount1Min, recipient, hookData), deadline
         );
+        delete positionControllers[tokenId];
         emit PositionBurned(tokenId, recipient);
     }
 
@@ -289,9 +296,25 @@ contract UniswapV4PositionManagerExample {
             params.hookData
         );
         positionManager.modifyLiquidities(unlockData, params.deadline);
+        if (params.recipient == address(this)) {
+            positionControllers[tokenId] = msg.sender;
+        }
         _refundTokenDelta(token0, msg.sender, startBalance0);
         _refundTokenDelta(token1, msg.sender, startBalance1);
 
         emit PositionMinted(tokenId, params.recipient, key.toId());
+    }
+
+    function _requirePositionController(uint256 tokenId) internal view {
+        IERC721 nft = IERC721(address(positionManager));
+        address owner = nft.ownerOf(tokenId);
+        if (owner == address(this)) {
+            if (positionControllers[tokenId] == msg.sender) return;
+            revert NotPositionController(msg.sender, tokenId);
+        }
+        if (msg.sender == owner || nft.getApproved(tokenId) == msg.sender || nft.isApprovedForAll(owner, msg.sender)) {
+            return;
+        }
+        revert NotPositionController(msg.sender, tokenId);
     }
 }

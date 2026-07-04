@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {ERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/utils/SafeERC20.sol";
+import {Ownable} from "openzeppelin-contracts@5.4.0/access/Ownable.sol";
 
 /// @title CosmosERC20
 /// @notice Wrapper deployed by the permissionless `deployERC20()` path.
@@ -25,7 +26,7 @@ contract CosmosERC20 is ERC20 {
 /// @title Gravity
 /// @notice Simplified Gravity Bridge model for the May 2026 denom-mapping poisoning exploit.
 /// @dev Reference: https://rekt.news/gravity-bridge-rekt
-contract Gravity {
+contract Gravity is Ownable {
     using SafeERC20 for IERC20;
 
     address[] public validators;
@@ -54,7 +55,7 @@ contract Gravity {
     error CustodyAssetCollision();
     error DenomCollision();
 
-    constructor(address[] memory validators_, uint256[] memory powers_) {
+    constructor(address[] memory validators_, uint256[] memory powers_) Ownable(msg.sender) {
         for (uint256 i = 0; i < validators_.length; i++) {
             validators.push(validators_[i]);
             validatorPower[validators_[i]] = powers_[i];
@@ -62,7 +63,7 @@ contract Gravity {
         }
     }
 
-    function registerValidator(address validator, uint256 power) external {
+    function registerValidator(address validator, uint256 power) external onlyOwner {
         if (power == 0) revert ZeroPower();
         validators.push(validator);
         validatorPower[validator] = power;
@@ -70,7 +71,7 @@ contract Gravity {
     }
 
     /// @notice Registers real custody assets and their canonical Cosmos denoms at bridge init.
-    function registerCustodyAsset(address token, string calldata cosmosDenom) external {
+    function registerCustodyAsset(address token, string calldata cosmosDenom) external onlyOwner {
         if (isCustodyAsset[token]) revert AlreadyRegistered();
         isCustodyAsset[token] = true;
         denomToErc20[cosmosDenom] = token;
@@ -89,24 +90,15 @@ contract Gravity {
     }
 
     /// @notice Simulates `MsgERC20DeployedClaim` processing on Gravity chain.
-    /// @dev Vulnerable version: format-check only, no collision guard against custody assets.
+    /// @dev Rejects attempts to map a new denom to an existing custody asset.
     function handleErc20Deployed(
         string calldata cosmosDenom,
         address tokenContract,
         string calldata name_,
         string calldata symbol_,
         uint8 decimals_
-    ) external {
-        _validateTokenContract(tokenContract);
-        // Metadata checks exist in production but are bypassable via predictable ibc-go values.
-        cosmosDenom;
-        name_;
-        symbol_;
-        decimals_;
-
-        // BUG: never calls erc20ToDenom[tokenContract] or isCustodyAsset[tokenContract].
-        denomToErc20[cosmosDenom] = tokenContract;
-        erc20ToDenom[tokenContract] = cosmosDenom;
+    ) external onlyOwner {
+        _handleErc20Deployed(cosmosDenom, tokenContract, name_, symbol_, decimals_);
     }
 
     /// @notice Patched handler — mirrors the missing `ERC20ToDenomLookup` / custody collision check.
@@ -116,7 +108,37 @@ contract Gravity {
         string calldata name_,
         string calldata symbol_,
         uint8 decimals_
-    ) external {
+    ) external onlyOwner {
+        _handleErc20Deployed(cosmosDenom, tokenContract, name_, symbol_, decimals_);
+    }
+
+    /// @notice Simulates `DenomToERC20Lookup` during batch construction.
+    function denomToERC20Lookup(string calldata cosmosDenom) public view returns (address) {
+        return denomToErc20[cosmosDenom];
+    }
+
+    /// @notice Simulates validator-authorized batch execution; owner stands in for signature verification in this model.
+    function submitWithdrawalBatch(string calldata cosmosDenom, address destination, uint256 amount)
+        external
+        onlyOwner
+    {
+        address token = denomToERC20Lookup(cosmosDenom);
+        if (token == address(0)) revert UnknownDenom();
+        IERC20(token).safeTransfer(destination, amount);
+        emit WithdrawBatch(token, destination, amount);
+    }
+
+    function getDenomToErc20(string calldata denom) external view returns (address) {
+        return denomToErc20[denom];
+    }
+
+    function _handleErc20Deployed(
+        string calldata cosmosDenom,
+        address tokenContract,
+        string calldata name_,
+        string calldata symbol_,
+        uint8 decimals_
+    ) internal {
         _validateTokenContract(tokenContract);
         cosmosDenom;
         name_;
@@ -131,23 +153,6 @@ contract Gravity {
 
         denomToErc20[cosmosDenom] = tokenContract;
         erc20ToDenom[tokenContract] = cosmosDenom;
-    }
-
-    /// @notice Simulates `DenomToERC20Lookup` during batch construction.
-    function denomToERC20Lookup(string calldata cosmosDenom) public view returns (address) {
-        return denomToErc20[cosmosDenom];
-    }
-
-    /// @notice Validators sign withdrawal batches; bridge releases mapped ERC20 from custody.
-    function submitWithdrawalBatch(string calldata cosmosDenom, address destination, uint256 amount) external {
-        address token = denomToERC20Lookup(cosmosDenom);
-        if (token == address(0)) revert UnknownDenom();
-        IERC20(token).safeTransfer(destination, amount);
-        emit WithdrawBatch(token, destination, amount);
-    }
-
-    function getDenomToErc20(string calldata denom) external view returns (address) {
-        return denomToErc20[denom];
     }
 
     function _validateTokenContract(address tokenContract) internal pure {
