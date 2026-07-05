@@ -6,20 +6,22 @@ import {console} from "forge-std@1.14.0/console.sol";
 import {exp} from "../src/Exp.sol";
 import {Strings} from "openzeppelin-contracts@5.4.0/utils/Strings.sol";
 
-// FOUNDRY_FUZZ_RUNS=100 forge test --match-path test/DifferentialTest.t.sol --ffi -vvv
+// RUN_FFI_TESTS=true FOUNDRY_FUZZ_RUNS=100 forge test --match-path test/DifferentialTest.t.sol --ffi -vvv
 
 contract DifferentialTest is Test {
     using Strings for uint256;
 
     uint256 private constant DELTA = 2 ** 64;
 
-    function setUp() public {}
+    function setUp() public {
+        if (!vm.envOr("RUN_FFI_TESTS", false)) vm.skip(true);
+    }
 
     function ffi_exp(int128 x) private returns (int128) {
         require(x >= 0, "x < 0");
 
         string[] memory inputs = new string[](3);
-        inputs[0] = "python";
+        inputs[0] = "python3";
         inputs[1] = "exp.py";
         inputs[2] = uint256(int256(x)).toString();
 
