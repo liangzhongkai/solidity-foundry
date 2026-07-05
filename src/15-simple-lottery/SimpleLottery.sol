@@ -70,6 +70,7 @@ contract SimpleLottery is ReentrancyGuard {
 
         Lottery storage lottery = _getLottery(lotteryId);
         if (block.timestamp >= lottery.purchaseDeadline) revert PurchaseWindowClosed();
+        if (block.number >= lottery.drawBlock) revert PurchaseWindowClosed();
 
         lottery.participants.push(msg.sender);
         lottery.ticketCount++;
