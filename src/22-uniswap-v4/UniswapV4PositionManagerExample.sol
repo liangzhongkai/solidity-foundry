@@ -43,6 +43,7 @@ contract UniswapV4PositionManagerExample {
 
     IPositionManager public immutable positionManager;
     IPermit2 public immutable permit2;
+    mapping(uint256 tokenId => address controller) public positionController;
 
     event Permit2Approval(address indexed token, uint160 amount, uint48 expiration);
     event PositionMinted(uint256 indexed tokenId, address indexed recipient, PoolId indexed poolId);
@@ -55,6 +56,7 @@ contract UniswapV4PositionManagerExample {
     error InvalidAmount();
     error InvalidRecipient();
     error NativeCurrencyNotSupported();
+    error NotPositionOwnerOrApproved();
 
     constructor(address positionManager_, address permit2_) {
         if (positionManager_ == address(0) || permit2_ == address(0)) revert ZeroAddress();
@@ -206,6 +208,7 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) public {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionOwnerOrApproved(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeDecreaseLiquidityUnlockData(key, tokenId, liquidity, amount0Min, amount1Min, recipient, hookData),
@@ -231,10 +234,12 @@ contract UniswapV4PositionManagerExample {
         bytes calldata hookData
     ) external {
         if (recipient == address(0)) revert InvalidRecipient();
+        _requirePositionOwnerOrApproved(tokenId);
         (PoolKey memory key,) = positionManager.getPoolAndPositionInfo(tokenId);
         positionManager.modifyLiquidities(
             encodeBurnPositionUnlockData(key, tokenId, amount0Min, amount1Min, recipient, hookData), deadline
         );
+        delete positionController[tokenId];
         emit PositionBurned(tokenId, recipient);
     }
 
@@ -289,9 +294,23 @@ contract UniswapV4PositionManagerExample {
             params.hookData
         );
         positionManager.modifyLiquidities(unlockData, params.deadline);
+        if (params.recipient == address(this)) {
+            positionController[tokenId] = msg.sender;
+        }
         _refundTokenDelta(token0, msg.sender, startBalance0);
         _refundTokenDelta(token1, msg.sender, startBalance1);
 
         emit PositionMinted(tokenId, params.recipient, key.toId());
+    }
+
+    function _requirePositionOwnerOrApproved(uint256 tokenId) internal view {
+        address owner = positionManager.ownerOf(tokenId);
+        if (
+            msg.sender != owner && msg.sender != positionController[tokenId]
+                && positionManager.getApproved(tokenId) != msg.sender
+                && !positionManager.isApprovedForAll(owner, msg.sender)
+        ) {
+            revert NotPositionOwnerOrApproved();
+        }
     }
 }
