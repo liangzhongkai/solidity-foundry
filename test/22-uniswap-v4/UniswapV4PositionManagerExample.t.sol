@@ -39,15 +39,18 @@ contract UniswapV4PositionManagerExampleTest is UniswapV4Base {
         assertGt(liquidityAfterIncrease, 0);
 
         address feeRecipient = makeAddr("fee-recipient");
+        vm.startPrank(funder);
         positionExample.collectFees(tokenId, block.timestamp + 1 hours, feeRecipient, bytes(""));
         positionExample.decreaseLiquidity(
             tokenId, liquidityAfterIncrease / 2, 0, 0, block.timestamp + 1 hours, feeRecipient, bytes("")
         );
+        vm.stopPrank();
 
         uint128 liquidityAfterDecrease = positionExample.getPositionLiquidity(tokenId);
         assertLt(liquidityAfterDecrease, liquidityAfterIncrease);
 
         address burnRecipient = makeAddr("burn-recipient");
+        vm.prank(funder);
         positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, burnRecipient, bytes(""));
         vm.expectRevert();
         positionExample.getPositionLiquidity(tokenId);
