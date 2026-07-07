@@ -5,6 +5,9 @@
       "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
     }
   },
+  "lib/foundry-huff": {
+    "rev": "7d1ce15ccf92bd68458c7e28e0ae847b64b4fc74"
+  },
   "lib/openzeppelin-contracts": {
     "tag": {
       "name": "v5.4.0",
