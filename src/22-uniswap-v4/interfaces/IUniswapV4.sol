@@ -207,4 +207,10 @@ interface IPositionManager {
     function getPoolAndPositionInfo(uint256 tokenId) external view returns (PoolKey memory, PositionInfo);
 
     function positionInfo(uint256 tokenId) external view returns (PositionInfo);
+
+    function ownerOf(uint256 tokenId) external view returns (address owner);
+
+    function getApproved(uint256 tokenId) external view returns (address operator);
+
+    function isApprovedForAll(address owner, address operator) external view returns (bool);
 }
