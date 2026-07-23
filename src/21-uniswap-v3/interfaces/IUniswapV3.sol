@@ -136,6 +136,12 @@ interface INonfungiblePositionManager {
     /// @dev Requires `liquidity == 0` and no outstanding owed tokens; usually preceded by `decreaseLiquidity` + `collect`.
     function burn(uint256 tokenId) external payable;
 
+    function ownerOf(uint256 tokenId) external view returns (address owner);
+
+    function getApproved(uint256 tokenId) external view returns (address operator);
+
+    function isApprovedForAll(address owner, address operator) external view returns (bool);
+
     function positions(uint256 tokenId)
         external
         view
