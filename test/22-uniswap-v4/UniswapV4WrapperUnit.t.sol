@@ -70,6 +70,8 @@ contract MockPoolManager {
     BalanceDelta public configuredModifyDelta;
     BalanceDelta public configuredFeesAccrued;
     BalanceDelta public configuredDonateDelta;
+    Currency public lastSyncedCurrency;
+    uint256 public syncCount;
 
     function setSwapDelta(BalanceDelta delta) external {
         configuredSwapDelta = delta;
@@ -117,7 +119,10 @@ contract MockPoolManager {
         return configuredDonateDelta;
     }
 
-    function sync(Currency) external {}
+    function sync(Currency currency) external {
+        lastSyncedCurrency = currency;
+        syncCount++;
+    }
 
     function take(Currency currency, address to, uint256 amount) external {
         MockERC20(Currency.unwrap(currency)).transfer(to, amount);
@@ -198,6 +203,9 @@ contract MockPositionManager is IPositionManager {
     mapping(uint256 => uint128) internal liquidities;
     mapping(uint256 => PoolKey) internal keys;
     mapping(uint256 => PositionInfo) internal infos;
+    mapping(uint256 => address) internal owners;
+    mapping(uint256 => address) internal approvals;
+    mapping(address => mapping(address => bool)) internal operatorApprovals;
 
     function modifyLiquidities(bytes calldata unlockData, uint256) external payable {
         (bytes memory actions, bytes[] memory params) = abi.decode(unlockData, (bytes, bytes[]));
@@ -222,6 +230,7 @@ contract MockPositionManager is IPositionManager {
             liquidities[tokenId] = uint128(liquidity);
             keys[tokenId] = key;
             infos[tokenId] = _packPositionInfo(key, tickLower, tickUpper);
+            owners[tokenId] = recipient;
             return;
         }
 
@@ -245,6 +254,8 @@ contract MockPositionManager is IPositionManager {
             (uint256 tokenId,,,) = abi.decode(params[0], (uint256, uint128, uint128, bytes));
             delete liquidities[tokenId];
             delete keys[tokenId];
+            delete owners[tokenId];
+            delete approvals[tokenId];
             infos[tokenId] = PositionInfo.wrap(0);
         }
     }
@@ -261,6 +272,27 @@ contract MockPositionManager is IPositionManager {
 
     function positionInfo(uint256 tokenId) external view returns (PositionInfo) {
         return infos[tokenId];
+    }
+
+    function ownerOf(uint256 tokenId) external view returns (address owner) {
+        owner = owners[tokenId];
+        require(owner != address(0), "owner query for nonexistent token");
+    }
+
+    function getApproved(uint256 tokenId) external view returns (address operator) {
+        return approvals[tokenId];
+    }
+
+    function isApprovedForAll(address owner, address operator) external view returns (bool) {
+        return operatorApprovals[owner][operator];
+    }
+
+    function setApproved(uint256 tokenId, address operator) external {
+        approvals[tokenId] = operator;
+    }
+
+    function setApprovedForAll(address owner, address operator, bool approved) external {
+        operatorApprovals[owner][operator] = approved;
     }
 
     function _packPositionInfo(PoolKey memory key, int24 tickLower, int24 tickUpper)
@@ -324,6 +356,8 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(amountOut, 5 ether);
         assertEq(dai.balanceOf(recipient), 5 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 2 ether);
+        assertEq(mockPoolManager.syncCount(), 1);
+        assertEq(Currency.unwrap(mockPoolManager.lastSyncedCurrency()), address(weth));
     }
 
     function testPoolManagerModifyLiquiditySettlesNegativeDeltas() public {
@@ -349,6 +383,8 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(feesAccrued.amount1(), 0.25 ether);
         assertEq(dai.balanceOf(address(mockPoolManager)), 3 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 1 ether);
+        assertEq(mockPoolManager.syncCount(), 2);
+        assertEq(Currency.unwrap(mockPoolManager.lastSyncedCurrency()), address(weth));
     }
 
     function testRouterSwapUsesPermit2ApprovalAndTransfersOutput() public {
@@ -416,6 +452,35 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(tokenId, 1);
         assertEq(positionExample.getPositionLiquidity(tokenId), 0);
         assertEq(permit2.lastSpender(), address(mockPositionManager));
+    }
+
+    function testPositionManagerRejectsUnauthorizedWrapperOwnedPositionActions() public {
+        PoolKey memory key = _poolKey();
+        address attacker = makeAddr("attacker");
+        dai.mint(trader, 100 ether);
+        weth.mint(trader, 100 ether);
+
+        vm.startPrank(trader);
+        dai.approve(address(positionExample), type(uint256).max);
+        weth.approve(address(positionExample), type(uint256).max);
+        uint256 tokenId = positionExample.mintPosition(
+            key, -120, 120, 1e12, 10 ether, 10 ether, block.timestamp + 1 hours, address(positionExample), bytes("")
+        );
+        vm.stopPrank();
+
+        assertEq(positionExample.positionController(tokenId), trader);
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionOwnerOrApproved.selector);
+        positionExample.collectFees(tokenId, block.timestamp + 1 hours, attacker, bytes(""));
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionOwnerOrApproved.selector);
+        positionExample.decreaseLiquidity(tokenId, 1, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
+
+        vm.prank(attacker);
+        vm.expectRevert(UniswapV4PositionManagerExample.NotPositionOwnerOrApproved.selector);
+        positionExample.burnPosition(tokenId, 0, 0, block.timestamp + 1 hours, attacker, bytes(""));
     }
 
     function _poolKey() internal view returns (PoolKey memory key) {
