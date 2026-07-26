@@ -69,11 +69,23 @@ contract UniswapV3LiquidityNftExample {
             _resolveTokensAndAmounts(tokenA, tokenB, amountADesired, amountBDesired);
 
         _pullAndApprove(token0, token1, amount0Desired, amount1Desired);
+        tokenId = _mintAndRefundUnused(
+            token0, token1, fee, tickLower, tickUpper, amount0Desired, amount1Desired, amount0Min, amount1Min, deadline
+        );
+    }
 
-        // Track pre-mint residual balances so only this call's unused pull is refunded.
-        uint256 startBalance0 = IERC20(token0).balanceOf(address(this)) - amount0Desired;
-        uint256 startBalance1 = IERC20(token1).balanceOf(address(this)) - amount1Desired;
-
+    function _mintAndRefundUnused(
+        address token0,
+        address token1,
+        uint24 fee,
+        int24 tickLower,
+        int24 tickUpper,
+        uint256 amount0Desired,
+        uint256 amount1Desired,
+        uint256 amount0Min,
+        uint256 amount1Min,
+        uint256 deadline
+    ) internal returns (uint256 tokenId) {
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
             token0: token0,
             token1: token1,
@@ -89,23 +101,22 @@ contract UniswapV3LiquidityNftExample {
         });
 
         uint128 liq;
-        uint256 a0;
-        uint256 a1;
+        uint256 used0;
+        uint256 used1;
         // slither-disable-next-line reentrancy-events -- event logs values returned by canonical NPM after mint completes
-        (tokenId, liq, a0, a1) = positionManager.mint(params);
-        emit PositionMinted(tokenId, liq, a0, a1);
+        (tokenId, liq, used0, used1) = positionManager.mint(params);
+        emit PositionMinted(tokenId, liq, used0, used1);
 
-        _refundTokenDelta(token0, msg.sender, startBalance0);
-        _refundTokenDelta(token1, msg.sender, startBalance1);
-        IERC20(token0).forceApprove(address(positionManager), 0);
-        IERC20(token1).forceApprove(address(positionManager), 0);
+        // Refund from NPM-reported usage so unused desired amounts cannot remain stuck in this wrapper.
+        _refundUnusedAndClearApproval(token0, amount0Desired, used0);
+        _refundUnusedAndClearApproval(token1, amount1Desired, used1);
     }
 
-    function _refundTokenDelta(address token, address recipient, uint256 startingBalance) internal {
-        uint256 endingBalance = IERC20(token).balanceOf(address(this));
-        if (endingBalance > startingBalance) {
-            IERC20(token).safeTransfer(recipient, endingBalance - startingBalance);
+    function _refundUnusedAndClearApproval(address token, uint256 amountDesired, uint256 amountUsed) internal {
+        if (amountDesired > amountUsed) {
+            IERC20(token).safeTransfer(msg.sender, amountDesired - amountUsed);
         }
+        IERC20(token).forceApprove(address(positionManager), 0);
     }
 
     /// @notice Removes `liquidity` from an existing position; principal becomes claimable via `collect` (and appears as `tokensOwed`).
