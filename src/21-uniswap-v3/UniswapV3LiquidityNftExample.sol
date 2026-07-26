@@ -51,6 +51,8 @@ contract UniswapV3LiquidityNftExample {
     }
 
     /// @notice Mints an NFT position; `tickLower`/`tickUpper` must be valid for the pool's tick spacing.
+    /// @dev Unused portions of `amountADesired` / `amountBDesired` are refunded to the caller. NPM only pulls the
+    ///      amounts required for the minted liquidity, so without a refund those leftovers would remain stuck here.
     function mintPosition(
         address tokenA,
         address tokenB,
@@ -67,6 +69,10 @@ contract UniswapV3LiquidityNftExample {
             _resolveTokensAndAmounts(tokenA, tokenB, amountADesired, amountBDesired);
 
         _pullAndApprove(token0, token1, amount0Desired, amount1Desired);
+
+        // Track pre-mint residual balances so only this call's unused pull is refunded.
+        uint256 startBalance0 = IERC20(token0).balanceOf(address(this)) - amount0Desired;
+        uint256 startBalance1 = IERC20(token1).balanceOf(address(this)) - amount1Desired;
 
         INonfungiblePositionManager.MintParams memory params = INonfungiblePositionManager.MintParams({
             token0: token0,
@@ -88,6 +94,18 @@ contract UniswapV3LiquidityNftExample {
         // slither-disable-next-line reentrancy-events -- event logs values returned by canonical NPM after mint completes
         (tokenId, liq, a0, a1) = positionManager.mint(params);
         emit PositionMinted(tokenId, liq, a0, a1);
+
+        _refundTokenDelta(token0, msg.sender, startBalance0);
+        _refundTokenDelta(token1, msg.sender, startBalance1);
+        IERC20(token0).forceApprove(address(positionManager), 0);
+        IERC20(token1).forceApprove(address(positionManager), 0);
+    }
+
+    function _refundTokenDelta(address token, address recipient, uint256 startingBalance) internal {
+        uint256 endingBalance = IERC20(token).balanceOf(address(this));
+        if (endingBalance > startingBalance) {
+            IERC20(token).safeTransfer(recipient, endingBalance - startingBalance);
+        }
     }
 
     /// @notice Removes `liquidity` from an existing position; principal becomes claimable via `collect` (and appears as `tokensOwed`).

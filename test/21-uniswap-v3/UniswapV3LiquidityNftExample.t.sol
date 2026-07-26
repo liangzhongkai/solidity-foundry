@@ -5,6 +5,7 @@ import {Test} from "forge-std@1.14.0/Test.sol";
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
 import {IERC721} from "openzeppelin-contracts@5.4.0/token/ERC721/IERC721.sol";
 
+import {ERC20} from "../../src/02-erc20/ERC20.sol";
 import {UniswapV3LiquidityNftExample} from "../../src/21-uniswap-v3/UniswapV3LiquidityNftExample.sol";
 import {
     IUniswapV3Factory,
@@ -14,6 +15,27 @@ import {
 
 interface IWETH {
     function deposit() external payable;
+}
+
+/// @dev Pulls only a fraction of the desired amounts so leftover refunds can be asserted without a fork.
+contract MockPartialPullPositionManager {
+    uint256 public nextTokenId = 1;
+
+    function mint(INonfungiblePositionManager.MintParams calldata params)
+        external
+        returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)
+    {
+        amount0 = params.amount0Desired / 4;
+        amount1 = params.amount1Desired / 2;
+        if (amount0 > 0) {
+            IERC20(params.token0).transferFrom(msg.sender, address(this), amount0);
+        }
+        if (amount1 > 0) {
+            IERC20(params.token1).transferFrom(msg.sender, address(this), amount1);
+        }
+        tokenId = nextTokenId++;
+        liquidity = 1;
+    }
 }
 
 /// @notice Tick math (no fork) plus fork flows for mint / decrease / collect / burn.
@@ -39,6 +61,52 @@ contract UniswapV3LiquidityNftExampleTest is Test {
         assertTrue(example.feeToTickSpacing(500) == int24(10));
         assertTrue(example.feeToTickSpacing(3000) == int24(60));
         assertTrue(example.feeToTickSpacing(10_000) == int24(200));
+    }
+
+    /// @dev Regression: imbalanced desired amounts must not leave unused ERC20 stuck in the wrapper.
+    function testMintPositionRefundsUnusedDesiredAmounts() public {
+        MockPartialPullPositionManager mockNpm = new MockPartialPullPositionManager();
+        UniswapV3LiquidityNftExample localExample = new UniswapV3LiquidityNftExample(address(mockNpm));
+
+        ERC20 tokenA = new ERC20("TokenA", "A", 18);
+        ERC20 tokenB = new ERC20("TokenB", "B", 18);
+        // Ensure token0 < token1 ordering is deterministic for assertions.
+        if (address(tokenA) > address(tokenB)) {
+            (tokenA, tokenB) = (tokenB, tokenA);
+        }
+
+        address lp = makeAddr("lp");
+        uint256 amount0Desired = 400 ether;
+        uint256 amount1Desired = 200 ether;
+        deal(address(tokenA), lp, amount0Desired);
+        deal(address(tokenB), lp, amount1Desired);
+
+        vm.startPrank(lp);
+        tokenA.approve(address(localExample), amount0Desired);
+        tokenB.approve(address(localExample), amount1Desired);
+
+        uint256 tokenId = localExample.mintPosition(
+            address(tokenA),
+            address(tokenB),
+            3000,
+            -60,
+            60,
+            amount0Desired,
+            amount1Desired,
+            0,
+            0,
+            block.timestamp + 1 hours
+        );
+        vm.stopPrank();
+
+        assertEq(tokenId, 1);
+        // Mock consumes 1/4 of token0 and 1/2 of token1; the rest must return to the LP.
+        assertEq(tokenA.balanceOf(lp), amount0Desired - (amount0Desired / 4));
+        assertEq(tokenB.balanceOf(lp), amount1Desired - (amount1Desired / 2));
+        assertEq(tokenA.balanceOf(address(localExample)), 0);
+        assertEq(tokenB.balanceOf(address(localExample)), 0);
+        assertEq(tokenA.allowance(address(localExample), address(mockNpm)), 0);
+        assertEq(tokenB.allowance(address(localExample), address(mockNpm)), 0);
     }
 
     function testFloorTickToSpacingHandlesNegativeTicks() public view {
