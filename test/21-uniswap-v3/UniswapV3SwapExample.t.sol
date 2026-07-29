@@ -4,11 +4,38 @@ pragma solidity 0.8.20;
 import {Test} from "forge-std@1.14.0/Test.sol";
 import {IERC20} from "openzeppelin-contracts@5.4.0/token/ERC20/IERC20.sol";
 
-import {IUniswapV3Factory, IUniswapV3Pool} from "../../src/21-uniswap-v3/interfaces/IUniswapV3.sol";
+import {ISwapRouter, IUniswapV3Factory, IUniswapV3Pool} from "../../src/21-uniswap-v3/interfaces/IUniswapV3.sol";
 import {UniswapV3SwapExample} from "../../src/21-uniswap-v3/UniswapV3SwapExample.sol";
+import {ERC20} from "../../src/02-erc20/ERC20.sol";
 
 interface IWETH {
     function deposit() external payable;
+}
+
+/// @dev Pulls only a fraction of `amountIn` so leftover refunds can be asserted without a fork.
+contract MockPartialPullSwapRouter {
+    uint256 public constant OUT_AMOUNT = 42;
+
+    function exactInputSingle(ISwapRouter.ExactInputSingleParams calldata params)
+        external
+        payable
+        returns (uint256 amountOut)
+    {
+        uint256 consumed = params.amountIn / 4;
+        if (consumed > 0) {
+            IERC20(params.tokenIn).transferFrom(msg.sender, address(this), consumed);
+        }
+        amountOut = OUT_AMOUNT;
+    }
+
+    function exactInput(ISwapRouter.ExactInputParams calldata params) external payable returns (uint256 amountOut) {
+        address tokenIn = address(bytes20(params.path[0:20]));
+        uint256 consumed = params.amountIn / 2;
+        if (consumed > 0) {
+            IERC20(tokenIn).transferFrom(msg.sender, address(this), consumed);
+        }
+        amountOut = OUT_AMOUNT;
+    }
 }
 
 /// @notice Fork tests for single- and multi-hop `SwapRouter` flows.
@@ -426,5 +453,63 @@ contract UniswapV3SwapExampleTest is Test {
         address pool = _wethDaiPool();
         vm.expectRevert(UniswapV3SwapExample.InvalidToken.selector);
         example.flashSwapExactOutput(pool, makeAddr("nope"), 1, recipient);
+    }
+
+    /// @dev Non-zero price limits (or thin liquidity) can leave unconsumed input in the wrapper; refunds must return it.
+    function testSwapExactInputSingleRefundsUnusedInput() public {
+        address router = example.SWAP_ROUTER();
+        vm.etch(router, address(new MockPartialPullSwapRouter()).code);
+
+        ERC20 tokenIn = new ERC20("TokenIn", "IN", 18);
+        ERC20 tokenOut = new ERC20("TokenOut", "OUT", 18);
+        address trader = makeAddr("partialFillTrader");
+        uint256 amountIn = 400 ether;
+        deal(address(tokenIn), trader, amountIn);
+
+        vm.startPrank(trader);
+        tokenIn.approve(address(example), amountIn);
+        uint256 amountOut = example.swapExactInputSingle(
+            address(tokenIn),
+            address(tokenOut),
+            FEE_030,
+            amountIn,
+            1,
+            1, // non-zero limit path in production; mock ignores it and still partial-pulls
+            block.timestamp + 1 hours,
+            recipient
+        );
+        vm.stopPrank();
+
+        assertEq(amountOut, MockPartialPullSwapRouter(router).OUT_AMOUNT());
+        assertEq(tokenIn.balanceOf(address(example)), 0);
+        assertEq(tokenIn.balanceOf(trader), amountIn - (amountIn / 4));
+        assertEq(tokenIn.allowance(address(example), router), 0);
+    }
+
+    function testSwapExactInputRefundsUnusedInput() public {
+        address router = example.SWAP_ROUTER();
+        vm.etch(router, address(new MockPartialPullSwapRouter()).code);
+
+        ERC20 tokenIn = new ERC20("TokenIn", "IN", 18);
+        address trader = makeAddr("partialFillMultiHopTrader");
+        uint256 amountIn = 200 ether;
+        deal(address(tokenIn), trader, amountIn);
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(tokenIn);
+        tokens[1] = DAI;
+        uint24[] memory fees = new uint24[](1);
+        fees[0] = FEE_030;
+        bytes memory path = example.encodePath(tokens, fees);
+
+        vm.startPrank(trader);
+        tokenIn.approve(address(example), amountIn);
+        uint256 amountOut = example.swapExactInput(path, amountIn, 1, block.timestamp + 1 hours, recipient);
+        vm.stopPrank();
+
+        assertEq(amountOut, MockPartialPullSwapRouter(router).OUT_AMOUNT());
+        assertEq(tokenIn.balanceOf(address(example)), 0);
+        assertEq(tokenIn.balanceOf(trader), amountIn / 2);
+        assertEq(tokenIn.allowance(address(example), router), 0);
     }
 }

@@ -75,6 +75,9 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
     }
 
     /// @notice Swap an exact amount of `tokenIn` for `tokenOut` through a single V3 pool (via router).
+    /// @dev Refunds any unconsumed `tokenIn` to the caller. A non-zero `sqrtPriceLimitX96` (or thin liquidity)
+    ///      can stop the swap before the full `amountIn` is pulled by the router, which would otherwise leave
+    ///      leftovers permanently stuck in this wrapper.
     function swapExactInputSingle(
         address tokenIn,
         address tokenOut,
@@ -87,6 +90,7 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
     ) external returns (uint256 amountOut) {
         if (recipient == address(0)) revert ZeroAddress();
 
+        uint256 balanceBefore = IERC20(tokenIn).balanceOf(address(this));
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
         IERC20(tokenIn).forceApprove(SWAP_ROUTER, amountIn);
 
@@ -103,11 +107,13 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
 
         // slither-disable-next-line reentrancy-events -- emits only after canonical router returns completed swap amounts
         amountOut = ISwapRouter(SWAP_ROUTER).exactInputSingle(params);
+        _refundUnusedInput(tokenIn, msg.sender, balanceBefore);
 
         emit ExactInSingle(tokenIn, tokenOut, fee, amountIn, amountOut, recipient);
     }
 
     /// @notice Multi-hop exact input using a packed `path` (via router).
+    /// @dev Refunds any unconsumed path input token to the caller after the router returns.
     function swapExactInput(
         bytes calldata path,
         uint256 amountIn,
@@ -119,6 +125,7 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
         if (path.length < 43) revert InvalidPath();
 
         address tokenIn = _pathFirstToken(path);
+        uint256 balanceBefore = IERC20(tokenIn).balanceOf(address(this));
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), amountIn);
         IERC20(tokenIn).forceApprove(SWAP_ROUTER, amountIn);
 
@@ -128,6 +135,7 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
 
         // slither-disable-next-line reentrancy-events -- emits only after canonical router returns completed swap amounts
         amountOut = ISwapRouter(SWAP_ROUTER).exactInput(params);
+        _refundUnusedInput(tokenIn, msg.sender, balanceBefore);
 
         emit ExactIn(path, amountIn, amountOut, recipient);
     }
@@ -218,5 +226,14 @@ contract UniswapV3SwapExample is IUniswapV3SwapCallback, IUniswapV3FlashCallback
 
     function _pathFirstToken(bytes calldata path) private pure returns (address) {
         return abi.decode(abi.encodePacked(bytes12(0), path[:20]), (address));
+    }
+
+    /// @dev Returns any `tokenIn` still held above `balanceBefore` and clears residual router approval.
+    function _refundUnusedInput(address tokenIn, address recipient, uint256 balanceBefore) private {
+        IERC20(tokenIn).forceApprove(SWAP_ROUTER, 0);
+        uint256 balanceAfter = IERC20(tokenIn).balanceOf(address(this));
+        if (balanceAfter > balanceBefore) {
+            IERC20(tokenIn).safeTransfer(recipient, balanceAfter - balanceBefore);
+        }
     }
 }
