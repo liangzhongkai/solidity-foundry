@@ -66,10 +66,17 @@ contract MockUniversalRouter is IUniversalRouter {
 contract MockPoolManager {
     using PoolIdLibrary for PoolKey;
 
+    error InsufficientLiquidity(uint128 available, int256 requested);
+
     BalanceDelta public configuredSwapDelta;
     BalanceDelta public configuredModifyDelta;
     BalanceDelta public configuredFeesAccrued;
     BalanceDelta public configuredDonateDelta;
+
+    bool public trackPositions;
+    bytes32 public lastModifySalt;
+    address public lastModifyCaller;
+    mapping(bytes32 => uint128) public liquidityBySalt;
 
     function setSwapDelta(BalanceDelta delta) external {
         configuredSwapDelta = delta;
@@ -84,6 +91,10 @@ contract MockPoolManager {
         configuredDonateDelta = delta;
     }
 
+    function setTrackPositions(bool enabled) external {
+        trackPositions = enabled;
+    }
+
     function unlock(bytes calldata data) external returns (bytes memory) {
         return IUnlockCallback(msg.sender).unlockCallback(data);
     }
@@ -92,11 +103,24 @@ contract MockPoolManager {
         return 0;
     }
 
-    function modifyLiquidity(PoolKey memory, ModifyLiquidityParams memory, bytes calldata)
+    function modifyLiquidity(PoolKey memory, ModifyLiquidityParams memory params, bytes calldata)
         external
-        view
         returns (BalanceDelta callerDelta, BalanceDelta feesAccrued)
     {
+        lastModifySalt = params.salt;
+        lastModifyCaller = msg.sender;
+
+        if (trackPositions) {
+            uint128 current = liquidityBySalt[params.salt];
+            if (params.liquidityDelta > 0) {
+                liquidityBySalt[params.salt] = current + uint128(uint256(params.liquidityDelta));
+            } else if (params.liquidityDelta < 0) {
+                uint256 decrease = uint256(-params.liquidityDelta);
+                if (decrease > current) revert InsufficientLiquidity(current, params.liquidityDelta);
+                liquidityBySalt[params.salt] = current - uint128(decrease);
+            }
+        }
+
         return (configuredModifyDelta, configuredFeesAccrued);
     }
 
@@ -105,11 +129,7 @@ contract MockPoolManager {
         /* key */
         SwapParams memory,
         bytes calldata
-    )
-        external
-        view
-        returns (BalanceDelta swapDelta)
-    {
+    ) external view returns (BalanceDelta swapDelta) {
         return configuredSwapDelta;
     }
 
@@ -185,7 +205,11 @@ contract MockStateView is IStateView {
         return liquidity;
     }
 
-    function getPositionInfo(PoolId, address, int24, int24, bytes32) external view returns (uint128, uint256, uint256) {
+    function getPositionInfo(PoolId, address, int24, int24, bytes32)
+        external
+        view
+        returns (uint128, uint256, uint256)
+    {
         return (positionLiquidity, feeGrowthInside0, feeGrowthInside1);
     }
 }
@@ -349,6 +373,73 @@ contract UniswapV4WrapperUnitTest is Test {
         assertEq(feesAccrued.amount1(), 0.25 ether);
         assertEq(dai.balanceOf(address(mockPoolManager)), 3 ether);
         assertEq(weth.balanceOf(address(mockPoolManager)), 1 ether);
+        assertEq(mockPoolManager.lastModifySalt(), poolManagerExample.positionSalt(trader, bytes32(0)));
+    }
+
+    function testPoolManagerModifyLiquidityNamespacesSaltPerCaller() public {
+        PoolKey memory key = _poolKey();
+        mockPoolManager.setModifyDelta(_delta(-1 ether, -1 ether), _delta(0, 0));
+        mockPoolManager.setTrackPositions(true);
+
+        address alice = makeAddr("alice");
+        address bob = makeAddr("bob");
+        bytes32 userSalt = bytes32(uint256(42));
+        uint256 liquidity = 1e12;
+
+        dai.mint(alice, 1 ether);
+        weth.mint(alice, 1 ether);
+
+        vm.startPrank(alice);
+        dai.approve(address(poolManagerExample), type(uint256).max);
+        weth.approve(address(poolManagerExample), type(uint256).max);
+        poolManagerExample.modifyLiquidity(
+            key,
+            ModifyLiquidityParams({tickLower: -120, tickUpper: 120, liquidityDelta: int256(liquidity), salt: userSalt}),
+            bytes(""),
+            alice
+        );
+        vm.stopPrank();
+
+        bytes32 aliceSalt = poolManagerExample.positionSalt(alice, userSalt);
+        bytes32 bobSalt = poolManagerExample.positionSalt(bob, userSalt);
+        assertTrue(aliceSalt != bobSalt);
+        assertEq(mockPoolManager.lastModifySalt(), aliceSalt);
+        assertEq(mockPoolManager.liquidityBySalt(aliceSalt), uint128(liquidity));
+        assertEq(mockPoolManager.liquidityBySalt(bobSalt), 0);
+
+        // Without namespacing, Bob could reuse Alice's user salt / ticks and drain the shared wrapper position.
+        mockPoolManager.setModifyDelta(_delta(1 ether, 1 ether), _delta(0, 0));
+        dai.mint(address(mockPoolManager), 1 ether);
+        weth.mint(address(mockPoolManager), 1 ether);
+
+        vm.prank(bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(MockPoolManager.InsufficientLiquidity.selector, uint128(0), -int256(liquidity))
+        );
+        poolManagerExample.modifyLiquidity(
+            key,
+            ModifyLiquidityParams({tickLower: -120, tickUpper: 120, liquidityDelta: -int256(liquidity), salt: userSalt}),
+            bytes(""),
+            bob
+        );
+
+        assertEq(mockPoolManager.liquidityBySalt(aliceSalt), uint128(liquidity));
+        assertEq(dai.balanceOf(bob), 0);
+        assertEq(weth.balanceOf(bob), 0);
+
+        // Alice can still exit her own namespaced position.
+        vm.prank(alice);
+        poolManagerExample.modifyLiquidity(
+            key,
+            ModifyLiquidityParams({tickLower: -120, tickUpper: 120, liquidityDelta: -int256(liquidity), salt: userSalt}),
+            bytes(""),
+            alice
+        );
+
+        assertEq(mockPoolManager.lastModifySalt(), aliceSalt);
+        assertEq(mockPoolManager.liquidityBySalt(aliceSalt), 0);
+        assertEq(dai.balanceOf(alice), 1 ether);
+        assertEq(weth.balanceOf(alice), 1 ether);
     }
 
     function testRouterSwapUsesPermit2ApprovalAndTransfersOutput() public {

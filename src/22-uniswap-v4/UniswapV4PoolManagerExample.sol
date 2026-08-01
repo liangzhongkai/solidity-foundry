@@ -22,6 +22,8 @@ import {
 /// @title UniswapV4PoolManagerExample
 /// @notice Direct singleton interactions for initializing pools, modifying liquidity, swapping, and donating.
 /// @dev This contract demonstrates the unlock callback flow that searchers and advanced integrators must understand for raw v4 core usage.
+///      PoolManager positions are owned by this wrapper (`msg.sender` inside the unlock callback). To prevent callers from sharing
+///      (and draining) the same position key, `modifyLiquidity` namespaces each user-supplied `salt` with `msg.sender`.
 contract UniswapV4PoolManagerExample is IUnlockCallback {
     using SafeERC20 for IERC20;
     using BalanceDeltaLibrary for BalanceDelta;
@@ -132,7 +134,15 @@ contract UniswapV4PoolManagerExample is IUnlockCallback {
         amountOut = abi.decode(poolManager.unlock(abi.encode(state)), (uint256));
     }
 
+    /// @notice Returns the PoolManager `salt` used for `owner`'s position under this wrapper.
+    /// @dev PoolManager keys positions by `(owner=this, tickLower, tickUpper, salt)`. Namespacing isolates callers.
+    function positionSalt(address owner, bytes32 userSalt) public pure returns (bytes32) {
+        return keccak256(abi.encode(owner, userSalt));
+    }
+
     /// @notice Adds or removes concentrated liquidity directly through the singleton, then settles any net token deltas.
+    /// @dev The supplied `params.salt` is namespaced with `msg.sender` so one caller cannot remove another caller's liquidity
+    ///      that was previously added through this wrapper under the same user salt / tick range.
     function modifyLiquidity(
         PoolKey calldata key,
         ModifyLiquidityParams calldata params,
@@ -140,6 +150,9 @@ contract UniswapV4PoolManagerExample is IUnlockCallback {
         address recipient
     ) external payable returns (BalanceDelta callerDelta, BalanceDelta feesAccrued) {
         if (recipient == address(0)) revert InvalidRecipient();
+
+        ModifyLiquidityParams memory namespacedParams = params;
+        namespacedParams.salt = positionSalt(msg.sender, params.salt);
 
         CallbackState memory state = CallbackState({
             op: Operation.ModifyLiquidity,
@@ -151,7 +164,7 @@ contract UniswapV4PoolManagerExample is IUnlockCallback {
             amountIn: 0,
             minAmountOut: 0,
             sqrtPriceLimitX96: 0,
-            liquidityParams: params,
+            liquidityParams: namespacedParams,
             amount0: 0,
             amount1: 0,
             nativeValue: msg.value
