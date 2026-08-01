@@ -51,7 +51,8 @@ flowchart LR
 
 - Router and PositionManager wrappers are intentionally custodial for the duration of each call: they pull ERC20s into the wrapper, forward Permit2 approvals, execute the canonical contract, then refund leftover balances.
 - Direct `PoolManager` flows settle negative deltas by pulling ERC20 from the caller and taking positive deltas to the requested recipient.
-- No admin roles are introduced; correctness depends on the caller providing the right `PoolKey`, tick range, and slippage bounds.
+- `UniswapV4PoolManagerExample.modifyLiquidity` namespaces each user-supplied `salt` with `msg.sender` before calling the singleton. PoolManager positions are owned by the wrapper, so without namespacing any caller who observes another user's `(tickLower, tickUpper, salt)` could remove that liquidity and take the tokens.
+- No admin roles are introduced; correctness depends on the caller providing the right `PoolKey`, tick range, and slippage bounds, plus using the wrapper's `positionSalt(owner, userSalt)` when reading raw PoolManager position state.
 
 ## External effects / invariants worth reviewing
 
