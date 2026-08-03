@@ -50,13 +50,24 @@ contract MockPermit2 is IPermit2 {
 contract MockUniversalRouter is IUniversalRouter {
     address public outputToken;
     uint256 public outputAmount;
+    address public inputToken;
+    uint256 public inputPullAmount;
 
     function setOutput(address outputToken_, uint256 outputAmount_) external {
         outputToken = outputToken_;
         outputAmount = outputAmount_;
     }
 
+    /// @notice Simulates Universal Router `SETTLE_ALL` pulling only the open debt (may be < amountIn).
+    function setInputPull(address inputToken_, uint256 inputPullAmount_) external {
+        inputToken = inputToken_;
+        inputPullAmount = inputPullAmount_;
+    }
+
     function execute(bytes calldata, bytes[] calldata, uint256) external payable {
+        if (inputToken != address(0) && inputPullAmount > 0) {
+            MockERC20(inputToken).transferFrom(msg.sender, address(this), inputPullAmount);
+        }
         if (outputToken != address(0) && outputAmount > 0) {
             MockERC20(outputToken).transfer(msg.sender, outputAmount);
         }
@@ -356,6 +367,10 @@ contract UniswapV4WrapperUnitTest is Test {
         weth.mint(trader, 2 ether);
         dai.mint(address(mockRouter), 7 ether);
         mockRouter.setOutput(address(dai), 7 ether);
+        mockRouter.setInputPull(address(weth), 2 ether);
+        // Router pulls via transferFrom in this mock (Permit2 path on mainnet).
+        vm.prank(address(routerExample));
+        weth.approve(address(mockRouter), type(uint256).max);
 
         vm.startPrank(trader);
         weth.approve(address(routerExample), type(uint256).max);
@@ -365,9 +380,37 @@ contract UniswapV4WrapperUnitTest is Test {
 
         assertEq(amountOut, 7 ether);
         assertEq(dai.balanceOf(recipient), 7 ether);
+        assertEq(weth.balanceOf(trader), 0);
+        assertEq(weth.balanceOf(address(routerExample)), 0);
         assertEq(permit2.lastToken(), address(weth));
         assertEq(permit2.lastSpender(), address(mockRouter));
         assertEq(permit2.lastAmount(), 2 ether);
+    }
+
+    function testRouterSwapRefundsUnusedInputWhenSettlePullsLessThanAmountIn() public {
+        PoolKey memory key = _poolKey();
+        uint128 amountIn = 2 ether;
+        uint256 consumed = 0.5 ether;
+        weth.mint(trader, amountIn);
+        dai.mint(address(mockRouter), 1 ether);
+        mockRouter.setOutput(address(dai), 1 ether);
+        // Thin liquidity / partial fill: settle debt is only `consumed`, not full `amountIn`.
+        mockRouter.setInputPull(address(weth), consumed);
+        vm.prank(address(routerExample));
+        weth.approve(address(mockRouter), type(uint256).max);
+
+        vm.startPrank(trader);
+        weth.approve(address(routerExample), type(uint256).max);
+        uint256 amountOut = routerExample.swapExactInputSingle(
+            key, false, amountIn, 0, block.timestamp + 1 hours, recipient, bytes("")
+        );
+        vm.stopPrank();
+
+        assertEq(amountOut, 1 ether);
+        assertEq(dai.balanceOf(recipient), 1 ether);
+        assertEq(weth.balanceOf(address(mockRouter)), consumed);
+        assertEq(weth.balanceOf(trader), amountIn - consumed);
+        assertEq(weth.balanceOf(address(routerExample)), 0);
     }
 
     function testStateViewReadsConfiguredPoolStateAndPosition() public {
