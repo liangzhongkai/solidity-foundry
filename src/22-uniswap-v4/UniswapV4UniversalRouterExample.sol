@@ -114,6 +114,9 @@ contract UniswapV4UniversalRouterExample {
         address tokenIn = Currency.unwrap(inputCurrency);
         address tokenOut = Currency.unwrap(outputCurrency);
 
+        // Pre-pull `amountIn`, then refund any remainder. V4 `SETTLE_ALL` only pulls the open
+        // debt, which can be less than `amountIn` when liquidity is thin or a hook returns delta.
+        uint256 startBalanceIn = IERC20(tokenIn).balanceOf(address(this));
         IERC20(tokenIn).safeTransferFrom(msg.sender, address(this), request.amountIn);
         approveTokenWithPermit2(
             tokenIn,
@@ -128,8 +131,16 @@ contract UniswapV4UniversalRouterExample {
         router.execute(commands, inputs, request.deadline);
         amountOut = IERC20(tokenOut).balanceOf(address(this)) - beforeOut;
         IERC20(tokenOut).safeTransfer(request.recipient, amountOut);
+        _refundTokenDelta(tokenIn, msg.sender, startBalanceIn);
 
         emit RouterExactIn(key.toId(), msg.sender, request.recipient, request.zeroForOne, request.amountIn, amountOut);
+    }
+
+    function _refundTokenDelta(address token, address recipient, uint256 startingBalance) internal {
+        uint256 endingBalance = IERC20(token).balanceOf(address(this));
+        if (endingBalance > startingBalance) {
+            IERC20(token).safeTransfer(recipient, endingBalance - startingBalance);
+        }
     }
 
     function _encodeExactInputSingle(
